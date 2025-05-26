@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Design Variables - Edit these to change app appearance */
+:root {
+  /* Primary Theme Colors */
+  --primary-color: #0334b9;
+  --primary-color-rgb: 3, 52, 185;
+  --primary-light: #4667d1;
+  --primary-dark: #6d86cc;
+  --secondary-color: #2fb9db;
+  --secondary-color-rgb: 47, 185, 219;
+  --secondary-light: #f472b6;
+  --secondary-dark: #db2777;
+
+  /* Gradients that use the theme colors */
+  --primary-gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  --secondary-gradient: linear-gradient(135deg, var(--secondary-color) 0%, var(--secondary-dark) 100%);
+
+  /* Background Settings - Suppression de l'URL par défaut */
+  --bg-image: linear-gradient(135deg, #080424 0%, #160e40 100%); /* On ne définit plus d'image par défaut ici */
+  --bg-overlay-from: rgba(0, 0, 0, 0);
+  --bg-overlay-to: rgba(3, 52, 185, 0);
+  --bg-overlay-gradient: linear-gradient(to bottom, var(--bg-overlay-from), var(--bg-overlay-to));
+
+  /* Text Colors */
+  --text-light: #ffffff;
+  --text-dark: #1f2937;
+  --text-muted: #9ca3af;
+
+  /* Common Styles */
+  --border-radius-sm: 0.375rem;
+  --border-radius-md: 0.75rem;
+  --border-radius-lg: 1rem;
+  --border-radius-xl: 1.5rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Page Background with Image - Mise à jour pour éviter le flash */
+.app-background {
+  min-height: 100vh;
+  background-color: #080424; /* Couleur de fond sombre en attente de l'image */
+  background-image: var(--bg-image, linear-gradient(135deg, #080424 0%, #160e40 100%));
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  transition: background-image 0.5s ease-in-out; /* Transition douce */
+}
+
+/* Overlay gradient progressif pour attendre le chargement */
+.app-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(8,4,36,0.8));
+  z-index: 0;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Ajout d'une classe pour l'état avec image chargée */
+.bg-loaded .app-background::before {
+  opacity: 0.4;
+}
+
+/* Make sure no default bg.png is set */
+[style*="bg.png"] {
+  background-image: linear-gradient(135deg, #080424 0%, #160e40 100%) !important;
+}
+
+/* Styles pour rendre les filtres CameraKit plus visibles */
+.camerakit-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  transform: scaleX(-1); /* Mirror webcam for selfie view */
+}
+
+/* Pour assurer que le conteneur CameraKit est visible en mode débogage */
+.camerakit-debug-container {
+  position: fixed !important;
+  z-index: 9999 !important;
+  border: 2px solid red !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  overflow: hidden !important;
+}
+
+/* Pour permettre de voir clairement les filtres pendant l'enregistrement */
+.karaoke-overlay {
+  opacity: 0.4 !important; /* Réduire l'opacité de la vidéo karaoke */
+}
+
+/* Ajouter à la fin du fichier globals.css */
+
+/* Styles pour CameraKit */
+.camerakit-debug-container {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 300px !important;
+  height: 200px !important;
+  z-index: 9999 !important;
+  border: 4px solid red !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+.camerakit-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}

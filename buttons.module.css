@@ -1,0 +1,46 @@
+.modernPrimary {
+  @apply relative inline-flex items-center justify-center px-7 py-4 overflow-hidden font-medium transition-all bg-gradient-to-br from-purple-600 to-blue-500 text-white rounded-xl shadow-xl hover:shadow-2xl group;
+}
+
+.modernSecondary {
+  @apply relative inline-flex items-center justify-center px-7 py-4 overflow-hidden font-medium text-white bg-black/40 backdrop-blur-sm rounded-xl border border-gray-700/50 transition-all hover:bg-black/60 hover:border-purple-500/50;
+}
+
+.modernRecord {
+  @apply relative inline-flex items-center justify-center px-8 py-4 overflow-hidden font-bold transition-all bg-gradient-to-r from-red-600 to-pink-600 rounded-xl shadow-xl hover:shadow-2xl group;
+}
+
+/* Effets après et avant */
+.modernPrimaryBefore {
+  @apply content-[''] absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-400 to-blue-400 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100;
+}
+
+.modernRecordAfter {
+  @apply content-[''] absolute inset-0 h-full w-full scale-0 rounded-xl bg-white/20 transition-transform duration-300 ease-out group-hover:scale-100;
+}
+
+/* Éléments enfants */
+.modernPrimarySpan {
+  @apply relative z-10;
+}
+
+/* Effets visuels */
+.textShadowGlow {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.shadowNeonPurple {
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.7);
+}
+
+.animateGradientXy {
+  animation: gradient-xy 10s ease infinite;
+  background-size: 400% 400%;
+}
+
+@keyframes gradient-xy {
+  0%, 100% { background-position: 0% 0%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+}
