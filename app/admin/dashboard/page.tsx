@@ -2,17 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+// Remove unused router import
 import { 
   FiMusic, 
   FiCalendar, 
   FiBarChart2, 
+  FiUsers,
   FiPlus,
   FiEye,
   FiExternalLink,
-  FiRefreshCw,
-  FiEdit2,
-  FiVideo
+  FiRefreshCw
+  // Remove unused icon imports
 } from 'react-icons/fi';
 import { fetchEvents } from '@/lib/supabase/events';
 import { getS3Categories, getS3SongsByCategory } from '@/lib/aws/s3Admin';
@@ -74,60 +74,29 @@ export default function AdminDashboard() {
     return `${baseUrl}/event/${eventId}`;
   };
 
-  // Add this utility function to get the background image URL for an event
-  const getEventBackgroundUrl = (event: Event) => {
-    if (event?.customization?.background_image) {
-      try {
-        const publicUrlResult = supabase.storage
-          .from('karaokestorage')
-          .getPublicUrl(`backgrounds/${event.customization.background_image}`);
-        
-        if (publicUrlResult.data?.publicUrl) {
-          return publicUrlResult.data.publicUrl;
-        }
-      } catch (error) {
-        console.error("Error getting background URL:", error);
-      }
-    }
-    return null; // Return null if no background image
-  };
+  // Remove unused function or just comment it out
+  // const getEventBackgroundUrl = (event: Event) => {
+  //   if (event?.customization?.background_image) {
+  //     try {
+  //       const publicUrlResult = supabase.storage
+  //         .from('karaokestorage')
+  //         .getPublicUrl(`backgrounds/${event.customization.background_image}`);
+  //       
+  //       if (publicUrlResult.data?.publicUrl) {
+  //         return publicUrlResult.data.publicUrl;
+  //       }
+  //     } catch (error) {
+  //       console.error("Error getting background URL:", error);
+  //     }
+  //   }
+  //   return null; // Return null if no background image
+  // };
 
-  // Fonction complètement réécrite pour extraire l'ID d'événement du chemin vidéo
-  const extractEventId = (path: string): string | null => {
-    if (!path) return null;
-    
-    // Format attendu: 'karaoke-videos/event_ID/session-xyz.webm'
-    const match = path.match(/karaoke-videos\/event_([^\/]+)/);
-    if (match && match[1]) {
-      return match[1].trim(); // Nettoyer l'ID extrait
-    }
-    return null;
-  };
-
-  // Fonction corrigée pour compter les vidéos par événement sans doublons
-  const countVideosByEvent = (videos: { name: string }[]): Record<string, number> => {
-    // Utiliser un objet simple au lieu d'une Map pour plus de clarté
-    const eventCounts: Record<string, number> = {};
-    
-    // Créer un Set pour suivre les chemins de fichiers uniques déjà traités
-    const processedVideos = new Set<string>();
-    
-    for (const video of videos) {
-      // Éviter de compter deux fois la même vidéo
-      if (processedVideos.has(video.name)) continue;
-      processedVideos.add(video.name);
-      
-      // Extraire l'ID de l'événement
-      const eventId = extractEventId(video.name);
-      if (!eventId) continue;
-      
-      // Incrémenter le compteur pour cet événement
-      eventCounts[eventId] = (eventCounts[eventId] || 0) + 1;
-    }
-    
-    console.log("Comptage vidéos par événement:", eventCounts);
-    return eventCounts;
-  };
+  // Remove unused function or just comment it out
+  // const countVideosByEvent = (videos: { name: string }[]): Record<string, number> => {
+  //   // ...existing code...
+  //   return eventCounts;
+  // };
 
   // Mise à jour du composant d'affichage des événements populaires avec debugging
   const PopularEventsChart = ({ events }: { events: Array<{ id: string, name: string, videos: number }> }) => {
