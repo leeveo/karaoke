@@ -63,7 +63,7 @@ function LiveKaraokeRecorderInner({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStep, setProcessingStep] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [useSnapFilters, setUseSnapFilters] = useState(true); // Activé par défaut
+  const [useSnapFilters, setUseSnapFilters] = useState(false); // Activé par défaut
   
   // Utiliser le contexte CameraKit
   const { 
@@ -224,14 +224,6 @@ function LiveKaraokeRecorderInner({
       window.onerror = originalWindowOnError;
     };
   }, []);
-
-  // Appliquer un filtre par défaut quand l'initialisation est terminée
-  useEffect(() => {
-    if (isInitialized && lenses.length > 0 && useSnapFilters) {
-      console.log("Auto-applying first filter");
-      applyLens(lenses[0]);
-    }
-  }, [isInitialized, lenses, useSnapFilters, applyLens]);
 
   // Configuration principale et boucle de rendu
   useEffect(() => {
@@ -774,11 +766,7 @@ function LiveKaraokeRecorderInner({
         }}
       >
         {status}
-        {useSnapFilters && currentLens && (
-          <span className="ml-2 text-sm opacity-90 font-bold">
-            • Filtre actif
-          </span>
-        )}
+        {/* Remove filter status */}
       </div>
       
       {/* Bouton "Arrêter l'enregistrement" */}
@@ -813,12 +801,7 @@ function LiveKaraokeRecorderInner({
             }}>
               Vidéo: {karaokeReady ? "✅" : "❌"}
             </span>
-            <span className="px-3 py-1 rounded-full" style={{ 
-              backgroundColor: useSnapFilters && currentLens ? 'var(--tertiary-color, #9333ea)' : 'rgba(255, 255, 255, 0.1)',
-              color: 'white'
-            }}>
-              Filtres: {useSnapFilters && currentLens ? "✅" : "❌"}
-            </span>
+            {/* Remove filter status indicator */}
           </div>
         </div>
       )}

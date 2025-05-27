@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  FiGrid, 
-  FiMusic, 
-  FiCalendar, 
-  FiBarChart2, 
-  FiUsers,
-  FiVideo,
+  // Remove unused icons
+  // FiGrid,
+  FiPieChart,
+  FiTrendingUp,
+  // FiBarChart2,
+  // FiUsers,
+  FiCalendar,
+  FiDownload,
   FiRefreshCw,
-  FiArrowUp,
-  FiChevronDown,
-  FiChevronUp,
-  FiPlay
+  FiMusic, // Add missing FiMusic icon
+  FiVideo, // Add missing FiVideo icon
+  FiChevronUp, // Add missing FiChevronUp icon
+  FiChevronDown, // Add missing FiChevronDown icon
+  FiPlay, // Add missing FiPlay icon
+  FiArrowUp // Add missing FiArrowUp icon
 } from 'react-icons/fi';
 import Link from 'next/link';
 import { fetchEvents } from '@/lib/supabase/events';
@@ -77,7 +81,8 @@ export default function AnalyticsPage() {
   const [eventStats, setEventStats] = useState<EventStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
-  const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
+  const [eventCounts, setEventCounts] = useState({ total: 0, active: 0, inactive: 0 });
+  const [songCounts, setSongCounts] = useState({ total: 0 });
   const [monthlyVideoData, setMonthlyVideoData] = useState<number[]>(Array(12).fill(0));
   const [selectedEventId, setSelectedEventId] = useState<string | 'all'>('all');
 
@@ -165,7 +170,11 @@ export default function AnalyticsPage() {
         eventStatsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
         setEventStats(eventStatsData);
-        setVideoCounts(videosByEvent);
+        setEventCounts({
+          total: eventData.length,
+          active: eventData.filter(event => event.is_active).length,
+          inactive: eventData.filter(event => !event.is_active).length,
+        });
         
         // Préparer les données pour l'activité mensuelle (initialiser à zéro)
         const monthCounts: number[] = Array(12).fill(0);
@@ -242,7 +251,11 @@ export default function AnalyticsPage() {
         eventStatsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
         setEventStats(eventStatsData);
-        setVideoCounts(videosByEvent);
+        setEventCounts({
+          total: eventData.length,
+          active: eventData.filter(event => event.is_active).length,
+          inactive: eventData.filter(event => !event.is_active).length,
+        });
         
         // 4. Calculer le nombre de vidéos récentes (30 derniers jours)
         const thirtyDaysAgo = new Date();

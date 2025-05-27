@@ -40,7 +40,7 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
     return (
       <div className="p-6 text-center">
         <div className="spinner"></div>
-        <p className="mt-2 text-gray-600">Chargement de l'événement...</p>
+        <p className="mt-2 text-gray-600">Chargement de l&apos;événement...</p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l'Événement</h1>
+      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l&apos;Événement</h1>
       <EventForm onSubmit={handleSubmit} initialData={event} />
     </div>
   );

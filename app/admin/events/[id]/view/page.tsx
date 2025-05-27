@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import Link from 'next/link';
+import Image from 'next/image'; // Add this import for Next.js Image component
 import { FiArrowLeft, FiEdit, FiExternalLink } from 'react-icons/fi';
 
 export default function ViewEventPage({ params }: { params: { id: string } }) {
@@ -16,8 +17,9 @@ export default function ViewEventPage({ params }: { params: { id: string } }) {
       try {
         const eventData = await fetchEventById(params.id);
         setEvent(eventData);
-      } catch (err) {
-        setError('Cet événement n\'existe pas ou n\'est plus disponible.');
+      } catch (error) { // Change variable name from 'err' to 'error' to use it
+        console.error("Error loading event:", error);
+        setError('Cet événement n&apos;existe pas ou n&apos;est plus disponible.');
       } finally {
         setLoading(false);
       }
@@ -42,7 +44,7 @@ export default function ViewEventPage({ params }: { params: { id: string } }) {
       <div className="p-6">
         <div className="bg-red-50 text-red-500 p-4 rounded-lg">
           <h2 className="text-lg font-medium mb-2">Erreur</h2>
-          <p>{error || 'Cet événement n\'est pas disponible.'}</p>
+          <p>{error || 'Cet événement n&apos;est pas disponible.'}</p>
           <div className="mt-4">
             <Link href="/admin/events" className="text-blue-500 hover:underline flex items-center">
               <FiArrowLeft className="mr-1" /> Retour à la liste des événements
@@ -87,7 +89,7 @@ export default function ViewEventPage({ params }: { params: { id: string } }) {
             
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Nom de l'événement</h3>
+                <h3 className="text-sm font-medium text-gray-500">Nom de l&apos;événement</h3>
                 <p className="text-lg">{event.name}</p>
               </div>
               
@@ -177,14 +179,16 @@ export default function ViewEventPage({ params }: { params: { id: string } }) {
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Image d'arrière-plan</h3>
+                <h3 className="text-sm font-medium text-gray-500">Image d&apos;arrière-plan</h3>
                 {event.customization?.background_image ? (
                   <div className="mt-2">
                     <div className="relative w-full h-40 rounded-md overflow-hidden">
-                      <img 
+                      {/* Replace img with Next.js Image component */}
+                      <Image 
                         src={event.customization.background_image} 
                         alt="Background" 
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                     </div>
                   </div>
@@ -201,7 +205,7 @@ export default function ViewEventPage({ params }: { params: { id: string } }) {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Créé le</span>
-                <span>{new Date(event.created_at).toLocaleDateString('fr-FR')}</span>
+                <span className="font-mono text-xs">{new Date(event.created_at).toLocaleDateString('fr-FR')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">ID</span>

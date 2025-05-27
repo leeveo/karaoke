@@ -15,7 +15,9 @@ export default function EventVideosAdminPage() {
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<Event | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+  // Remove unused state variables
+  // const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+  
   // Nouveaux états pour gérer la suppression
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -59,12 +61,10 @@ export default function EventVideosAdminPage() {
     loadData();
   }, [id]);
 
-  // Fonction pour extraire une miniature à partir de l'URL vidéo (simulée)
-  const getVideoThumbnailUrl = (videoUrl: string) => {
-    // Dans un vrai projet, utiliser un service de génération de miniatures
-    // Pour la démo, on utilise une image générique différente selon l'index
-    return '/placeholder-thumbnail.jpg';
-  };
+  // Remove unused function or implement it properly
+  // const getVideoThumbnailUrl = (videoUrl: string) => {
+  //   return '/placeholder-thumbnail.jpg';
+  // };
 
   // Formater la date
   const formatDate = (date: Date) => {
@@ -182,11 +182,11 @@ export default function EventVideosAdminPage() {
       if (signedUrl) {
         setSignedVideoUrl(signedUrl);
       } else {
-        setError("Impossible de générer l'URL d'accès pour cette vidéo");
+        setError("Impossible de générer l&apos;URL d&apos;accès pour cette vidéo");
       }
     } catch (err) {
-      console.error("Erreur lors de la récupération de l'URL signée:", err);
-      setError("Erreur d'accès à la vidéo");
+      console.error("Erreur lors de la récupération de l&apos;URL signée:", err);
+      setError("Erreur d&apos;accès à la vidéo");
     }
   };
 
@@ -446,7 +446,7 @@ export default function EventVideosAdminPage() {
               {/* URL copiable */}
               <div className="mt-3 flex items-center border border-gray-700 rounded overflow-hidden">
                 <div className="flex-1 bg-gray-800 p-2 text-gray-300 text-sm overflow-hidden overflow-ellipsis whitespace-nowrap">
-                  {signedVideoUrl || 'Chargement de l\'URL...'}
+                  {signedVideoUrl || 'Chargement de l&apos;URL...'}
                 </div>
                 <button
                   onClick={copyVideoUrl}
@@ -579,10 +579,10 @@ export default function EventVideosAdminPage() {
             <h3 className="text-sm font-medium text-yellow-800">Important - Conformité légale</h3>
             <div className="mt-2 text-sm text-yellow-700">
               <p className="mb-2">
-                <strong>RGPD et droit à l'image :</strong> Veuillez vous assurer que tous les utilisateurs dont les vidéos sont visionnées ont explicitement consenti au traitement de leurs données personnelles et à l'utilisation de leur image, conformément au Règlement Général sur la Protection des Données (RGPD) et au droit à l'image.
+                <strong>RGPD et droit à l&apos;image :</strong> Veuillez vous assurer que tous les utilisateurs dont les vidéos sont visionnées ont explicitement consenti au traitement de leurs données personnelles et à l&apos;utilisation de leur image, conformément au Règlement Général sur la Protection des Données (RGPD) et au droit à l&apos;image.
               </p>
               <p>
-                L'accès à ces vidéos doit être strictement limité aux personnes autorisées. En cas de demande de suppression par un utilisateur, vous êtes tenu de retirer rapidement la vidéo concernée de votre système.
+                L&apos;accès à ces vidéos doit être strictement limité aux personnes autorisées. En cas de demande de suppression par un utilisateur, vous êtes tenu de retirer rapidement la vidéo concernée de votre système.
               </p>
             </div>
           </div>

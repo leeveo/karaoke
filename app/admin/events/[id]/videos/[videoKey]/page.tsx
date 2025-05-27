@@ -6,12 +6,13 @@ import { fetchEventById } from '@/lib/supabase/events';
 import { getSignedVideoUrl } from '@/services/s3Service';
 import { FiChevronLeft, FiDownload } from 'react-icons/fi';
 import Link from 'next/link';
+import { Event } from '@/types/event'; // Make sure this import is available
 
 export default function VideoPlayerPage() {
   const { id, videoKey } = useParams();
   const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<Event | null>(null); // Fixed: Specify proper type instead of any
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +71,7 @@ export default function VideoPlayerPage() {
         || 'Vidéo';
         
       return songName;
-    } catch (e) {
+    } catch (_) { // Fixed: Use underscore for unused variable
       return "Vidéo";
     }
   };
@@ -99,7 +100,7 @@ export default function VideoPlayerPage() {
           <div className="aspect-video flex items-center justify-center bg-black p-8">
             <div className="text-center">
               <p className="text-red-400 font-medium text-lg mb-4">{error}</p>
-              <p className="text-white/60 mb-4">Impossible de lire cette vidéo. Il est possible que la vidéo ne soit plus disponible ou que vous n'ayez pas les permissions nécessaires.</p>
+              <p className="text-white/60 mb-4">Impossible de lire cette vidéo. Il est possible que la vidéo ne soit plus disponible ou que vous n&apos;ayez pas les permissions nécessaires.</p>
               <button 
                 onClick={() => router.back()}
                 className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100"

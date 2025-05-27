@@ -7,11 +7,12 @@ import {
   FiMusic, 
   FiCalendar, 
   FiBarChart2, 
-  FiUsers,
   FiPlus,
   FiEye,
   FiExternalLink,
-  FiRefreshCw
+  FiRefreshCw,
+  FiEdit2,
+  FiVideo
 } from 'react-icons/fi';
 import { fetchEvents } from '@/lib/supabase/events';
 import { getS3Categories, getS3SongsByCategory } from '@/lib/aws/s3Admin';
@@ -28,7 +29,6 @@ export default function AdminDashboard() {
     totalCategories: 0,
   });
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const { Canvas: QRCanvas } = useQRCode();
 
   // Charger les données au chargement de la page
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
   };
 
   // Add this utility function to get the background image URL for an event
-  const getEventBackgroundUrl = (event) => {
+  const getEventBackgroundUrl = (event: Event) => {
     if (event?.customization?.background_image) {
       try {
         const publicUrlResult = supabase.storage
@@ -92,70 +92,6 @@ export default function AdminDashboard() {
     return null; // Return null if no background image
   };
 
-  // Update the events section in your dashboard
-  const EventsSection = ({ events }) => {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {events.map((event) => {
-          const bgImageUrl = getEventBackgroundUrl(event);
-          
-          return (
-            <div 
-              key={event.id} 
-              className="relative overflow-hidden rounded-lg shadow-md h-48 group"
-            >
-              {/* Background Image */}
-              <div 
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
-                style={{ 
-                  backgroundImage: bgImageUrl ? `url(${bgImageUrl})` : 'var(--primary-gradient)',
-                }}
-              ></div>
-              
-              {/* Gradient Overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/40"></div>
-              
-              {/* Content */}
-              <div className="relative z-10 h-full flex flex-col justify-between p-4">
-                <Link 
-                  href={`/admin/events/${event.id}/view`}
-                  className="text-xl font-semibold text-white hover:underline"
-                >
-                  {event.name}
-                </Link>
-                
-                <div className="flex justify-between items-center">
-                  <span 
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      event.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {event.is_active ? 'Actif' : 'Inactif'}
-                  </span>
-                  
-                  <div className="flex space-x-2">
-                    <Link 
-                      href={`/admin/events/${event.id}/edit`}
-                      className="p-1 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
-                    >
-                      <FiEdit2 className="h-4 w-4" />
-                    </Link>
-                    <Link 
-                      href={`/admin/events/${event.id}/videos`}
-                      className="p-1 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
-                    >
-                      <FiVideo className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
   // Fonction complètement réécrite pour extraire l'ID d'événement du chemin vidéo
   const extractEventId = (path: string): string | null => {
     if (!path) return null;
@@ -169,7 +105,7 @@ export default function AdminDashboard() {
   };
 
   // Fonction corrigée pour compter les vidéos par événement sans doublons
-  const countVideosByEvent = (videos: any[]): Record<string, number> => {
+  const countVideosByEvent = (videos: { name: string }[]): Record<string, number> => {
     // Utiliser un objet simple au lieu d'une Map pour plus de clarté
     const eventCounts: Record<string, number> = {};
     
@@ -193,62 +129,8 @@ export default function AdminDashboard() {
     return eventCounts;
   };
 
-  // Fonction de chargement des statistiques - simplifiée et corrigée
-  const loadStats = async () => {
-    try {
-      setLoading(true);
-      
-      // 1. Charger les événements et les vidéos
-      const eventsData = await fetchEvents();
-      const { videos } = await fetchAllVideos();
-      
-      // 2. Créer un mapping des événements par ID pour référence rapide
-      const eventsById: Record<string, Event> = {};
-      eventsData.forEach(event => {
-        eventsById[event.id] = event;
-      });
-      
-      // 3. Compter les vidéos par événement
-      const videoCounts = countVideosByEvent(videos);
-      
-      // 4. Construire les données d'événements populaires
-      const eventVideoData = Object.entries(videoCounts).map(([eventId, count]) => {
-        const event = eventsById[eventId];
-        return {
-          id: eventId,
-          name: event ? event.name : `Événement #${eventId}`,
-          videos: count
-        };
-      });
-      
-      // 5. Trier et limiter les événements populaires
-      const topEvents = eventVideoData
-        .sort((a, b) => b.videos - a.videos)
-        .slice(0, 5);
-      
-      console.log("Top 5 des événements:", topEvents);
-      
-      // 6. Mettre à jour les statistiques
-      setStats({
-        totalEvents: eventsData.length,
-        activeEvents: eventsData.filter(e => e.is_active).length,
-        totalSongs: await countSongs(),
-        totalCategories: await countCategories(),
-        totalVideos: videos.length,
-        popularEvents: topEvents
-      });
-      
-      setEvents(eventsData);
-      
-    } catch (error) {
-      console.error("Erreur lors du chargement des statistiques:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Mise à jour du composant d'affichage des événements populaires avec debugging
-  const PopularEventsChart = ({ events }) => {
+  const PopularEventsChart = ({ events }: { events: Array<{ id: string, name: string, videos: number }> }) => {
     if (!events || events.length === 0) {
       return <div className="text-center py-6 text-gray-500">Aucune donnée disponible</div>;
     }
@@ -578,22 +460,22 @@ export default function AdminDashboard() {
         <h3 className="text-lg font-medium text-gray-900 mb-4">Guide rapide</h3>
         <div className="space-y-4">
           <div className="p-4 border border-blue-200 bg-blue-50 rounded-md">
-            <h4 className="font-medium text-blue-800">1. Création d'un nouvel événement</h4>
+            <h4 className="font-medium text-blue-800">1. Création d&apos;un nouvel événement</h4>
             <p className="mt-1 text-sm text-blue-600">
-              Commencez par créer un nouvel événement dans la section "Événements". Renseignez le nom, la date,
+              Commencez par créer un nouvel événement dans la section &quot;Événements&quot;. Renseignez le nom, la date,
               le lieu, et personnalisez les couleurs.
             </p>
           </div>
           <div className="p-4 border border-purple-200 bg-purple-50 rounded-md">
-            <h4 className="font-medium text-purple-800">2. Personnalisation de l'événement</h4>
+            <h4 className="font-medium text-purple-800">2. Personnalisation de l&apos;événement</h4>
             <p className="mt-1 text-sm text-purple-600">
-              Personnalisez les couleurs et l'apparence de votre événement pour refléter votre marque ou votre thème.
+              Personnalisez les couleurs et l&apos;apparence de votre événement pour refléter votre marque ou votre thème.
             </p>
           </div>
           <div className="p-4 border border-green-200 bg-green-50 rounded-md">
-            <h4 className="font-medium text-green-800">3. Partage de l'URL ou du QR code</h4>
+            <h4 className="font-medium text-green-800">3. Partage de l&apos;URL ou du QR code</h4>
             <p className="mt-1 text-sm text-green-600">
-              Chaque événement dispose d'une URL unique et d'un QR code que vous pouvez partager avec les participants.
+              Chaque événement dispose d&apos;une URL unique et d&apos;un QR code que vous pouvez partager avec les participants.
             </p>
           </div>
           <div className="p-4 border border-blue-200 bg-blue-50 rounded-md">
