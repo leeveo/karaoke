@@ -37,14 +37,12 @@ export default function EditEventPage() {
     }
   };
 
-  // Convert Event to EventInput for the form
+  // Convert Event to EventInput for the form - fix type issues
   const prepareFormData = (event: Event): EventInput => {
     return {
       name: event.name,
       date: event.date,
-      // Remove location as it's not in the EventInput type
-      is_active: event.is_active,
-      // Ensure customization is not null
+      // Remove properties not in EventInput type
       customization: event.customization || {
         primary_color: '#0334b9',
         secondary_color: '#2fb9db',
