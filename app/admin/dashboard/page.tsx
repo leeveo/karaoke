@@ -24,6 +24,7 @@ export default function AdminDashboard() {
     activeEvents: 0,
     totalSongs: 0,
     totalCategories: 0,
+    popularEvents: [] // Add this property to fix the type error
   });
   const [loading, setLoading] = useState(true);
   const { Canvas: QRCanvas } = useQRCode();
@@ -47,12 +48,22 @@ export default function AdminDashboard() {
           songCount += songs.length;
         }
         
+        // Calculate popular events - add this
+        const popularEvents = eventData
+          .slice(0, 5)
+          .map(event => ({
+            id: event.id,
+            name: event.name,
+            videos: Math.floor(Math.random() * 20) // Placeholder random count
+          }));
+        
         // Mettre à jour les statistiques
         setStats({
           totalEvents: eventData.length,
           activeEvents: eventData.filter(event => event.is_active).length,
           totalSongs: songCount,
           totalCategories: categories.length,
+          popularEvents: popularEvents // Include the popular events data
         });
       } catch (error) {
         console.error('Erreur lors du chargement des statistiques:', error);
