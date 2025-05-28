@@ -42,7 +42,7 @@ export default function EditEventPage() {
     return {
       name: event.name,
       date: event.date,
-      location: event.location || '',
+      // Remove location as it's not in the EventInput type
       is_active: event.is_active,
       // Ensure customization is not null
       customization: event.customization || {
