@@ -85,7 +85,7 @@ export default function EventQRPage() {
 
       // Convert back to hex
       return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
+    } catch {
       return color; // Return original color if any error occurs
     }
   }
@@ -123,7 +123,7 @@ export default function EventQRPage() {
           if (pageUrl.startsWith('http') && !pageUrl.startsWith('blob:')) {
             try {
               // Try to do a HEAD request to check if the URL is accessible
-              const response = await fetch(pageUrl, { 
+              await fetch(pageUrl, { 
                 method: 'HEAD',
                 mode: 'no-cors' // Use no-cors to avoid CORS issues with the check
               });
@@ -170,7 +170,6 @@ export default function EventQRPage() {
   }, [pageUrl, router, id]);
 
   // États
-  const [isSharing, setIsSharing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -288,7 +287,7 @@ export default function EventQRPage() {
       
     } catch (error) {
       console.error('Erreur lors de l\'envoi du formulaire:', error);
-      setFormError('Erreur lors de l\'envoi de l\'email, veuillez réessayer');
+      setFormError('Erreur lors de l&apos;envoi de l&apos;email, veuillez réessayer');
     } finally {
       setIsSubmitting(false);
     }
@@ -312,7 +311,7 @@ export default function EventQRPage() {
         <div className="bg-black bg-opacity-60 p-8 rounded-lg text-center">
           <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
-          <p className="text-white/60 mt-2">Veuillez patienter ou revenir à l'événement</p>
+          <p className="text-white/60 mt-2">Veuillez patienter </p>
          
         </div>
       </div>
@@ -368,8 +367,7 @@ export default function EventQRPage() {
           </div>
           
           {loadError && (
-            <div 
-              className="mb-4 p-3 rounded-md text-sm text-center"
+            <div className="p-3 rounded-md text-sm text-center"
               style={{ 
                 backgroundColor: 'rgba(239, 68, 68, 0.1)', 
                 borderLeft: '3px solid var(--secondary-color)',
@@ -383,7 +381,6 @@ export default function EventQRPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={handleShareButtonClick}
-              disabled={isSharing}
               className="text-white px-6 py-3 rounded-lg transition-all duration-300 w-full"
               style={{ 
                 background: 'var(--secondary-gradient)',
@@ -394,7 +391,7 @@ export default function EventQRPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                 </svg>
-                {isSharing ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
+                {showForm ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
               </span>
             </button>
             
@@ -411,7 +408,7 @@ export default function EventQRPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10.293 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
-                Retour à l'événement
+                Retour 
               </span>
             </button>
           </div>
@@ -499,7 +496,7 @@ export default function EventQRPage() {
                   </div>
                   <div className="ml-3 text-sm">
                     <label htmlFor="rgpdConsent" className="font-medium text-gray-700">
-                      J'accepte les conditions RGPD
+                     Accepter les conditions RGPD
                     </label>
                     <p className="text-gray-500 text-xs mt-1">
                       En cochant cette case, vous acceptez que nous utilisions vos données personnelles pour vous contacter à propos de votre performance karaoké. Vos données ne seront pas partagées avec des tiers.
@@ -513,7 +510,7 @@ export default function EventQRPage() {
                     color: 'var(--primary-dark)'
                   }}
                 >
-                  <p>Un email contenant votre vidéo karaoké {event ? `de l'événement "${event.name}"` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
+                  <p>Un email contenant votre vidéo karaoké {event ? `de l&apos;événement "${event.name}"` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
                 </div>
 
                 <div className="flex flex-col gap-3 mt-6">

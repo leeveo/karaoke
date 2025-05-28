@@ -10,7 +10,7 @@ export async function uploadEventImage(file: File): Promise<string> {
     console.log("Début de l'upload:", fileName, "dans karaokestorage/backgrounds/");
     
     // Upload avec upsert: true pour écraser si le fichier existe déjà
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('karaokestorage')
       .upload(filePath, file, {
         cacheControl: '3600',

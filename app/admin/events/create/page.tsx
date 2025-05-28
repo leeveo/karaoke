@@ -8,10 +8,11 @@ import { EventInput } from '@/types/event';
 import { ensureDevelopmentUser, getCurrentUser } from '@/lib/supabase/auth';
 
 export default function CreateEventPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{email?: string; id?: string}>({});
 
   // Vérifier l'authentification
   useEffect(() => {
@@ -42,61 +43,15 @@ export default function CreateEventPage() {
     checkAuth();
   }, []);
 
+  // Replace 'any' with a more specific type (EventInput)
   const handleSubmit = async (eventData: EventInput) => {
     try {
-      setError(null);
-      
-      if (!user) {
-        setError('Vous devez être connecté pour créer un événement.');
-        return;
-      }
-      
-      // Vérification des données requises
-      if (!eventData.name || !eventData.date) {
-        setError('Le nom et la date sont requis.');
-        return;
-      }
-      
-      console.log("Données du formulaire à envoyer:", JSON.stringify(eventData, null, 2));
-      
-      // Vérifier que toutes les données de personnalisation sont présentes
-      const eventDataToSend = {
-        ...eventData,
-        customization: {
-          primary_color: eventData.customization.primary_color,
-          secondary_color: eventData.customization.secondary_color,
-          background_image: eventData.customization.background_image || null,
-          logo: eventData.customization.logo || null
-        }
-      };
-      
-      const eventId = await createEvent(eventDataToSend);
-      
-      if (!eventId) {
-        setError("Impossible de créer l'événement - aucun ID retourné.");
-        return;
-      }
-      
-      console.log("Événement créé avec succès, ID:", eventId);
-      
-      // Modification ici: ne pas naviguer automatiquement si on est en train d'interagir avec un modal
-      if (document.querySelector('[data-preview-button="true"]')) {
-        // Si un bouton de prévisualisation est présent dans le DOM, vérifier s'il a été cliqué récemment
-        const recentClick = sessionStorage.getItem('recent-preview-click');
-        const now = Date.now();
-        if (recentClick && now - parseInt(recentClick) < 1000) {
-          // Si un clic récent a été détecté, ne pas naviguer
-          return;
-        }
-      }
-      
+      setIsSubmitting(true);
+      await createEvent(eventData); // Don't save the unused eventId
       router.push('/admin/events');
-    } catch (error: any) {
-      console.error('Failed to create event:', error);
-      setError(error instanceof Error 
-        ? `Erreur: ${error.message}` 
-        : "Une erreur inconnue s'est produite lors de la création de l'événement."
-      );
+    } catch (error) {
+      console.error("Error creating event:", error);
+      setIsSubmitting(false);
     }
   };
 
@@ -139,7 +94,7 @@ export default function CreateEventPage() {
         </div>
       )}
       
-      <EventForm onSubmit={handleSubmit} />
+      <EventForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
     </div>
   );
 }

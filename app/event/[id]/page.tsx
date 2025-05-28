@@ -7,6 +7,7 @@ import CategorySelector from '@/components/CategorySelector';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import Image from 'next/image';
 
 export default function EventPage({ params }: { params: { id: string } }) {
   const [event, setEvent] = useState<Event | null>(null);
@@ -34,7 +35,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
 
       // Convert back to hex
       return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
+    } catch {
       return color; // Return original color if any error occurs
     }
   }
@@ -94,7 +95,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
                 eventData.customization.backgroundImageUrl = bgUrl;
                 
                 // Pré-charger l'image avant de définir la variable CSS
-                const img = new Image();
+                const img = new window.Image();
                 img.src = bgUrl;
                 img.onload = () => {
                   console.log("Background image loaded successfully");
@@ -157,7 +158,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="spinner"></div>
-        <p className="ml-3 text-white">Chargement de l'événement...</p>
+        <p className="ml-3 text-white">Chargement de l&apos;événement...</p>
       </div>
     );
   }
@@ -166,25 +167,26 @@ export default function EventPage({ params }: { params: { id: string } }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-white">
         <h1 className="text-3xl font-bold mb-4">Événement introuvable</h1>
-        <p>{error || 'Cet événement n\'est pas disponible.'}</p>
+        <p>{error || 'Cet événement n&apos;est pas disponible.'}</p>
         <button 
           onClick={() => router.push('/')}
           className="mt-6 px-6 py-3 bg-white text-purple-800 rounded-lg font-medium"
         >
-          Retour à l'accueil
+          Retour à l&apos;accueil
         </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center relative overflow-hidden"
+    <div className={`min-h-screen flex flex-col items-center relative overflow-hidden ${bgLoaded ? 'bg-loaded' : ''}`}
       style={{
         backgroundImage: event?.customization?.backgroundImageUrl 
           ? `url('${event.customization.backgroundImageUrl}')` 
           : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
         backgroundSize: "cover",
-        backgroundPosition: "center"
+        backgroundPosition: "center",
+        transition: "background-image 0.5s ease-in-out"
       }}>
       {/* Overlay for readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/60 backdrop-blur-sm"></div>
@@ -201,9 +203,11 @@ export default function EventPage({ params }: { params: { id: string } }) {
           {/* Display the logo if available */}
           {event.customization?.logoUrl && (
             <div className="w-64 h-64 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
-              <img 
+              <Image 
                 src={event.customization.logoUrl} 
                 alt={`${event.name} Logo`} 
+                width={200}
+                height={200}
                 className="max-w-full max-h-full object-contain"
               />
             </div>

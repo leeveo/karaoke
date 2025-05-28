@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  // Remove unused icons
-  // FiPieChart,
-  // FiTrendingUp,
   FiCalendar,
-  // FiDownload,
   FiRefreshCw,
-  FiMusic
+  FiMusic,
+  FiVideo, // Add missing icon
+  FiArrowUp, // Add missing icon
+  FiChevronUp, // Add missing icon
+  FiChevronDown, // Add missing icon
+  FiPlay // Add missing icon
 } from 'react-icons/fi';
 import Link from 'next/link';
 import { fetchEvents } from '@/lib/supabase/events';
@@ -410,7 +411,7 @@ export default function AnalyticsPage() {
 
       {/* Statistiques globales */}
       <div className="p-6 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-500 rounded-lg shadow text-white">
-        <h3 className="text-xl font-medium mb-6">Vue d'ensemble</h3>
+        <h3 className="text-xl font-medium mb-6">Vue d&apos;ensemble</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           {/* Événements */}
           <div className="flex items-center space-x-4">
@@ -659,8 +660,8 @@ export default function AnalyticsPage() {
         <div className="text-sm text-gray-600 space-y-2">
           <p>• Les statistiques sont basées sur les vidéos enregistrées dans le système de stockage des vidéos.</p>
           <p>• Les événements sans vidéos enregistrées ne sont pas inclus dans certaines statistiques.</p>
-          <p>• Les "vidéos récentes" correspondent aux enregistrements des 30 derniers jours.</p>
-          <p>• Pour voir toutes les vidéos d'un événement spécifique, cliquez sur "Voir toutes les vidéos".</p>
+          <p>• Les &quot;vidéos récentes&quot; correspondent aux enregistrements des 30 derniers jours.</p>
+          <p>• Pour voir toutes les vidéos d&apos;un événement spécifique, cliquez sur &quot;Voir toutes les vidéos&quot;.</p>
         </div>
       </div>
     </div>

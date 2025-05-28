@@ -261,7 +261,7 @@ export default function EventVideosAdminPage() {
           href={`/admin/events`} 
           className="text-blue-600 hover:text-blue-800 flex items-center"
         >
-          <FiChevronLeft className="mr-1" /> Retour à l'événement
+          <FiChevronLeft className="mr-1" /> Retour à l&apos;événement
         </Link>
         
         {videos.length > 0 && (
@@ -275,7 +275,7 @@ export default function EventVideosAdminPage() {
       </div>
       
       <h1 className="text-2xl font-semibold text-gray-800">
-        Vidéos de l'événement: {event?.name || id}
+        Vidéos de l&apos;événement: {event?.name || id}
       </h1>
 
       {deleteSuccess && (
@@ -299,10 +299,10 @@ export default function EventVideosAdminPage() {
           </div>
           <h3 className="mt-4 text-lg font-medium text-gray-900">Aucune vidéo trouvée</h3>
           <p className="mt-2 text-base text-gray-500">
-            Aucune vidéo n'a été enregistrée pour cet événement ou le format de stockage n'est pas compatible.
+            Aucune vidéo n&apos;a été enregistrée pour cet événement ou le format de stockage n&apos;est pas compatible.
           </p>
           <p className="mt-4 text-sm text-gray-500">
-            Les vidéos apparaîtront ici lorsque les participants utiliseront la fonctionnalité karaoké lors de l'événement.
+            Les vidéos apparaîtront ici lorsque les participants utiliseront la fonctionnalité karaoké lors de l&apos;événement.
           </p>
         </div>
       ) : (
@@ -446,7 +446,7 @@ export default function EventVideosAdminPage() {
               {/* URL copiable */}
               <div className="mt-3 flex items-center border border-gray-700 rounded overflow-hidden">
                 <div className="flex-1 bg-gray-800 p-2 text-gray-300 text-sm overflow-hidden overflow-ellipsis whitespace-nowrap">
-                  {signedVideoUrl || 'Chargement de l&apos;URL...'}
+                  {signedVideoUrl || "Chargement de l'URL..."}
                 </div>
                 <button
                   onClick={copyVideoUrl}

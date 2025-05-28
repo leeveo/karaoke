@@ -43,8 +43,8 @@ export default function QRPage() {
           // For non-S3 URLs or if signing failed, use direct URL but check access
           if (pageUrl.startsWith('http') && !pageUrl.startsWith('blob:')) {
             try {
-              // Try to do a HEAD request to check if the URL is accessible
-              const response = await fetch(pageUrl, { 
+              // Just call fetch without assigning the response
+              await fetch(pageUrl, { 
                 method: 'HEAD',
                 mode: 'no-cors' // Use no-cors to avoid CORS issues with the check
               });
@@ -91,7 +91,8 @@ export default function QRPage() {
   }, [pageUrl, router]);
 
   // États
-  const [isSharing, setIsSharing] = useState(false);
+  // Fix: Remove unused isSharing state
+  // const [isSharing, setIsSharing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -219,7 +220,7 @@ export default function QRPage() {
         <div className="bg-black bg-opacity-60 p-8 rounded-lg text-center">
           <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
-          <p className="text-white/60 mt-2">Veuillez patienter ou revenir à l'accueil</p>
+          <p className="text-white/60 mt-2">Veuillez patienter</p>
          
         </div>
       </div>
@@ -274,7 +275,7 @@ export default function QRPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={handleShareButtonClick}
-              disabled={isSharing}
+              disabled={isSubmitting}
               className="text-white px-6 py-3 rounded-lg transition-all duration-300 w-full"
               style={{ 
                 background: 'var(--secondary-gradient)',
@@ -285,7 +286,7 @@ export default function QRPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                 </svg>
-                {isSharing ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
+                {showForm ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
               </span>
             </button>
             
@@ -391,7 +392,7 @@ export default function QRPage() {
                   </div>
                   <div className="ml-3 text-sm">
                     <label htmlFor="rgpdConsent" className="font-medium text-gray-700">
-                      J'accepte les conditions RGPD
+                     Accepter les conditions RGPD
                     </label>
                     <p className="text-gray-500 text-xs mt-1">
                       En cochant cette case, vous acceptez que nous utilisions vos données personnelles pour vous contacter à propos de votre performance karaoké. Vos données ne seront pas partagées avec des tiers.

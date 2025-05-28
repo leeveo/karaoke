@@ -110,5 +110,7 @@ export async function deleteEvent(id: string): Promise<void> {
 
 export async function uploadEventImage(file: File): Promise<string> {
   await new Promise(resolve => setTimeout(resolve, 1000));
-  return `https://picsum.photos/1920/1080?random=${Math.floor(Math.random() * 100)}`;
+  // Use the file parameter to create a more consistent mock URL
+  const fileId = file.name.replace(/\s+/g, '-').toLowerCase();
+  return `https://picsum.photos/1920/1080?random=${fileId}`;
 }

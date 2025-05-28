@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 import ColorPicker from '../ui/ColorPicker';
 import TemplateSelector from './TemplateSelector';
 import { fetchTemplates } from '@/lib/supabase/templates';
+import Image from 'next/image';
 
 interface EventFormProps {
   onSubmit: (data: EventInput) => void;
@@ -33,8 +34,6 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [uploadingBackground, setUploadingBackground] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Load templates on component mount
   useEffect(() => {
@@ -115,14 +114,12 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     setBackgroundPreview(previewUrl);
     
     try {
-      setUploadingBackground(true);
-      
       // Generate a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `bg_${Date.now()}.${fileExt}`;
       
       // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('karaokestorage')
         .upload(`backgrounds/${fileName}`, file);
       
@@ -142,8 +139,6 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     } catch (error) {
       console.error('Error uploading background:', error);
       setFormError("Erreur lors de l'upload de l'image de fond");
-    } finally {
-      setUploadingBackground(false);
     }
   };
 
@@ -163,14 +158,12 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     setLogoPreview(previewUrl);
     
     try {
-      setUploadingLogo(true);
-      
       // Generate a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `logo_${Date.now()}.${fileExt}`;
       
       // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('karaokestorage')
         .upload(`logos/${fileName}`, file);
       
@@ -192,8 +185,6 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     } catch (error) {
       console.error('Error uploading logo:', error);
       setFormError("Erreur lors de l'upload du logo");
-    } finally {
-      setUploadingLogo(false);
     }
   };
 
@@ -253,10 +244,10 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 max-w-8xl mx-auto space-y-8">
-      <h2 className="text-2xl font-bold text-gray-800 mb-2">Informations de l'événement</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">Informations événement</h2>
       <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-lg shadow">
         <h3 className="text-lg font-semibold text-blue-800 mb-2">Personnalisez votre expérience karaoké</h3>
-        <p className="text-blue-700">Ajoutez des couleurs, des images et d'autres éléments de style pour créer une expérience unique pour votre événement.</p>
+        <p className="text-blue-700">Ajoutez des couleurs, des images et des éléments de style pour créer une expérience unique pour votre événement.</p>
       </div>
 
       {formError && (
@@ -277,7 +268,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
       {/* Basic Information Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label htmlFor="name" className="block text-gray-700 font-medium mb-2">Nom de l'événement *</label>
+          <label htmlFor="name" className="block text-gray-700 font-medium mb-2">Nom Evénement *</label>
           <input
             type="text"
             id="name"
@@ -291,7 +282,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
         </div>
         
         <div>
-          <label htmlFor="date" className="block text-gray-700 font-medium mb-2">Date de l'événement *</label>
+          <label htmlFor="date" className="block text-gray-700 font-medium mb-2">Date Evénement *</label>
           <input
             type="date"
             id="date"
@@ -346,18 +337,28 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
           {backgroundPreview && (
             <div className="mb-4">
               <div className="relative w-full h-40 bg-gray-200 rounded-lg overflow-hidden">
+                {/* Option 1: Using unoptimized Image */}
+                <Image 
+                  src={backgroundPreview} 
+                  alt="Background preview" 
+                  className="object-cover" 
+                  fill 
+                  unoptimized
+                />
+                {/* Option 2: If still having issues, comment out the Image component above and uncomment this:
                 <img 
                   src={backgroundPreview} 
                   alt="Background preview" 
                   className="w-full h-full object-cover" 
                 />
+                */}
                 <button
                   type="button"
                   onClick={() => {
                     setBackgroundPreview(null);
                     setFormValues({...formValues, customization: {...formValues.customization, background_image: ''}});
                   }}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 z-10"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -391,16 +392,18 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
 
       {/* Logo Upload Section */}
       <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Logo de l'événement</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Logo de l&apos;événement</h3>
         
         {/* Preview du logo */}
         {logoPreview && (
           <div className="mb-4">
             <div className="relative w-48 h-48 mx-auto bg-white rounded-lg shadow-md p-2 border border-gray-200">
-              <img 
+              <Image 
                 src={logoPreview} 
                 alt="Logo preview" 
-                className="w-full h-full object-contain" 
+                className="object-contain" 
+                fill
+                unoptimized
               />
               <button
                 type="button"
@@ -408,7 +411,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
                   setLogoPreview(null);
                   setFormValues({...formValues, customization: {...formValues.customization, logo: ''}});
                 }}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 z-10"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -446,7 +449,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
           type="submit"
           className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
         >
-          Créer l'événement
+          Créer un événement
         </button>
       </div>
     </form>

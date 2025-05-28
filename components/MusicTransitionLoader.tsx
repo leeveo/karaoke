@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 interface MusicTransitionLoaderProps {
   isVisible: boolean;
@@ -9,7 +9,11 @@ interface MusicTransitionLoaderProps {
   progress?: number;
 }
 
-export default function MusicTransitionLoader({ isVisible, step, progress: externalProgress }: MusicTransitionLoaderProps) {
+const MusicTransitionLoader: React.FC<MusicTransitionLoaderProps> = ({ 
+  isVisible, 
+  step = "Traitement en cours...",
+  progress = 0
+}) => {
   const [internalProgress, setInternalProgress] = useState(0);
   const [loadingText, setLoadingText] = useState('Préparation de votre performance...');
   
@@ -31,7 +35,7 @@ export default function MusicTransitionLoader({ isVisible, step, progress: exter
     let interval: NodeJS.Timeout | null = null;
     
     // If external progress is provided, don't use the internal progress animation
-    if (externalProgress === undefined) {
+    if (progress === undefined) {
       // Simulate progress with irregular increments to feel more natural
       interval = setInterval(() => {
         setInternalProgress(prev => {
@@ -48,10 +52,10 @@ export default function MusicTransitionLoader({ isVisible, step, progress: exter
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isVisible, externalProgress]);
+  }, [isVisible, progress]);
 
   // Determine which progress to use (external or internal)
-  const progressToShow = externalProgress !== undefined ? externalProgress : internalProgress;
+  const progressToShow = progress !== undefined ? progress : internalProgress;
 
   // Important: Only render the component when isVisible is true
   if (!isVisible) return null;
@@ -268,4 +272,6 @@ export default function MusicTransitionLoader({ isVisible, step, progress: exter
       </motion.div>
     </motion.div>
   );
-}
+};
+
+export default MusicTransitionLoader;

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { fetchTemplates, getTemplateImageUrl } from '@/lib/supabase/templates';
+import { useState } from 'react';
+import { getTemplateImageUrl } from '@/lib/supabase/templates';
 import { Template } from '@/types/template';
 import TemplatePreviewModal from './TemplatePreviewModal';
+import Image from 'next/image';
 
 // Update the interface to match how the component is actually used
 interface TemplateSelectorProps {
@@ -17,8 +18,9 @@ export default function TemplateSelector({
   onSelect,
   selectedTemplate
 }: TemplateSelectorProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Remove unused state setters while keeping the state variables
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
 
   // État pour le modal de prévisualisation
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
@@ -101,10 +103,12 @@ export default function TemplateSelector({
               <div className="relative w-full h-full">
                 {/* Image de fond */}
                 <div className="absolute inset-0 bg-gray-200">
-                  <img
+                  <Image
                     src={imageUrl}
                     alt={template.name}
-                    className="w-full h-full object-cover"
+                    className="object-cover"
+                    fill
+                    unoptimized
                   />
                 </div>
                 

@@ -39,8 +39,12 @@ export default function LoginForm() {
         setIsLoading(false);
       }
       
-    } catch (err: any) {
-      setError(err?.message || 'Erreur de connexion');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'Erreur de connexion');
+      } else {
+        setError('Erreur de connexion');
+      }
       setIsLoading(false);
     }
   };

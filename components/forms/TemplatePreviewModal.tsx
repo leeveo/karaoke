@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Template } from '@/types/template';
 import { getTemplateImageUrl } from '@/lib/supabase/templates';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 interface TemplatePreviewModalProps {
   template: Template;
@@ -19,7 +20,6 @@ export default function TemplatePreviewModal({
   isSelected
 }: TemplatePreviewModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const imageUrl = getTemplateImageUrl(template.background_image);
   
   // Gestion des clics en dehors du modal pour fermer - CORRIGÉ
   useEffect(() => {
@@ -78,9 +78,14 @@ export default function TemplatePreviewModal({
 
       // Convert back to hex
       return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
+    } catch {
       return color; // Return original color if any error occurs
     }
+  };
+
+  // Remove unused parameter
+  const handleClose = () => {
+    onClose();
   };
 
   return (
@@ -102,7 +107,7 @@ export default function TemplatePreviewModal({
             {template.name}
           </h3>
           <button 
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -117,11 +122,22 @@ export default function TemplatePreviewModal({
             {/* Aperçu du template */}
             <div className="w-full md:w-2/3 relative rounded-lg overflow-hidden shadow-md" style={{ minHeight: '300px' }}>
               <div className="absolute inset-0">
-                <img
-                  src={imageUrl}
-                  alt={template.name}
-                  className="w-full h-full object-cover"
-                />
+                {/* Replace img with Image component */}
+                <div className="relative h-40 mb-4 overflow-hidden rounded-lg">
+                  {template.background_image ? (
+                    <Image
+                      src={getTemplateImageUrl(template.background_image)}
+                      alt="Template background"
+                      className="object-cover"
+                      fill
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full bg-gray-200">
+                      <p className="text-gray-500">Pas d&apos;image de fond</p>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Overlay pour simuler le style de l'événement */}
@@ -133,7 +149,7 @@ export default function TemplatePreviewModal({
                   className="text-3xl font-bold mb-4"
                   style={{ color: template.primary_color }}
                 >
-                  Exemple d'événement
+                  Exemple Evénement
                 </div>
                 
                 <div className="max-w-md w-full">

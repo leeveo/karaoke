@@ -32,7 +32,7 @@ export async function uploadToS3(file: Blob, filename: string): Promise<string |
       const buffer = await file.arrayBuffer();
       
       // Direct S3 upload with explicit public-read ACL
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         s3.upload({
           Bucket: bucketName,
           Key: filename,

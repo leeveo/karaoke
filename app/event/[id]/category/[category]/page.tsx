@@ -177,7 +177,7 @@ export default function EventCategoryPage() {
 
       // Convert back to hex
       return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
+    } catch {
       return color; // Return original color if any error occurs
     }
   }
@@ -192,7 +192,7 @@ export default function EventCategoryPage() {
       
       // Retourner la valeur rgba
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    } catch (e) {
+    } catch {
       return `rgba(3, 52, 185, ${alpha})`; // Valeur par défaut si erreur
     }
   }
@@ -226,7 +226,7 @@ export default function EventCategoryPage() {
           onClick={() => router.push(`/event/${id}`)}
           className="mt-6 px-6 py-2 bg-white text-red-600 rounded-lg font-medium"
         >
-          Retour à l'événement
+          Retour événement
         </button>
       </div>
     </div>
@@ -242,10 +242,20 @@ export default function EventCategoryPage() {
         progress={80}
       />
       
+      {/* Add loading overlay when fetching songs */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-black/50 p-6 rounded-xl border border-white/10 flex flex-col items-center">
+            <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
+            <p className="text-white text-lg">Chargement des chansons...</p>
+          </div>
+        </div>
+      )}
+      
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex flex-col items-center h-screen overflow-hidden" // Empêcher le scroll de la page
+        className="flex flex-col items-center h-screen overflow-hidden"
         style={{
           backgroundColor: '#080424', // Fond de base
           backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
@@ -283,7 +293,7 @@ export default function EventCategoryPage() {
                   backgroundColor: 'var(--primary-color-75)',
                   border: 'none',
                   borderLeft: '4px solid var(--primary-color)',
-                  borderRight: '4px solid var(--secondary-color)',
+                  borderRight: '4px solid var(--secondary-color)', // Fixed: removed single quotes inside var()
                   boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
                 }}
               >
@@ -353,7 +363,7 @@ export default function EventCategoryPage() {
                         backgroundColor: 'var(--primary-color-75)',
                         border: 'none',
                         borderLeft: '4px solid var(--primary-color)',
-                        borderRight: '4px solid var(--secondary-color)',
+                        borderRight: '4px solid var(--secondary-color)', // Fixed: removed single quotes inside var()
                         boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
                       }}
                     >

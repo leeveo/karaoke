@@ -1,9 +1,9 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   FiGrid, 
   FiCalendar, 
   FiMusic, 
-  FiUsers, 
   FiSettings,
   FiBarChart2
 } from 'react-icons/fi';
@@ -34,7 +34,7 @@ export default function AdminSidebar({ activeTab, isOpen, onClose }: AdminSideba
       <div className="p-6">
         <div className="flex items-center justify-center mb-8">
           <Link href="/admin/dashboard" className="flex items-center">
-            <img src="/logo.png" alt="Karaoke SaaS Logo" className="h-10 mr-3" />
+            <Image src="/logo.png" alt="Karaoke SaaS Logo" width={40} height={40} className="h-10 mr-3" />
             <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-500 to-indigo-400">
               KaraokeSaaS
             </span>
@@ -68,7 +68,7 @@ export default function AdminSidebar({ activeTab, isOpen, onClose }: AdminSideba
         <div className="bg-blue-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">
             <p className="font-medium text-blue-600">Aide & Support</p>
-            <p className="mt-1 text-xs">Besoin d'aide? Contactez-nous via le centre d'assistance.</p>
+            <p className="mt-1 text-xs">Besoin d&apos;aide . Contactez-nous par email.</p>
             <a 
               href="mailto:support@karaoke.example.com" 
               className="mt-2 text-xs text-blue-600 hover:text-blue-800 block"

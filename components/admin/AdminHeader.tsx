@@ -30,7 +30,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
       </div>
       
       <div className="hidden lg:block flex-1">
-        <h1 className="text-xl font-semibold text-gray-800">Tableau d'administration</h1>
+        <h1 className="text-xl font-semibold text-gray-800">Tableau Administration</h1>
       </div>
       
       <div className="flex items-center space-x-4">

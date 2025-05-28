@@ -54,12 +54,13 @@ export default function CategoryPage() {
           onClick={() => router.push('/')}
           className="mt-6 px-6 py-2 bg-white text-red-600 rounded-lg font-medium"
         >
-          Retour à l'accueil
+          Retour Accueil
         </button>
       </div>
     </div>
   );
 
+  // Either remove the unused 'isLoading' state or use it in the UI
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -161,6 +162,13 @@ export default function CategoryPage() {
             )}
           </ul>
         </div>
+
+        {/* Either use isLoading in the UI or remove it */}
+        {isLoading && (
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

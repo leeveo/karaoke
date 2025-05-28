@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { FiPlus, FiEdit2, FiTrash2, FiEye, FiExternalLink, FiSearch, FiFilter, FiCalendar, FiCopy, FiX, FiVideo } from 'react-icons/fi';
+import { 
+  FiPlus, FiTrash2, FiEdit, FiEye, FiCalendar, 
+  FiSearch, FiFilter, FiVideo, FiCopy, FiX
+} from 'react-icons/fi';
 import { IoQrCode } from 'react-icons/io5';
 import { fetchEvents, deleteEvent } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
@@ -14,6 +17,7 @@ export default function EventsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [selectedQR, setSelectedQR] = useState<{id: string, url: string} | null>(null);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   useEffect(() => {
     async function loadEvents() {
@@ -69,7 +73,7 @@ export default function EventsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-semibold text-gray-800">Gestion des Événements</h1>
         <Link href="/admin/events/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center shadow-sm">
@@ -80,7 +84,7 @@ export default function EventsPage() {
       {/* Filtres et recherche */}
       <div className="bg-white p-4 rounded-lg shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-4">
-          <div className="flex-1 relative">
+          <div className="relative w-full max-w-xs">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <FiSearch className="h-5 w-5 text-gray-400" />
             </div>
@@ -93,23 +97,38 @@ export default function EventsPage() {
             />
           </div>
           
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2 text-sm text-gray-700">
-              <FiFilter className="h-4 w-4" />
-              <span>Statut:</span>
-            </div>
-            <select
-              value={filterActive === null ? 'all' : filterActive ? 'active' : 'inactive'}
-              onChange={(e) => {
-                if (e.target.value === 'all') setFilterActive(null);
-                else setFilterActive(e.target.value === 'active');
-              }}
-              className="block w-full py-2 px-3 border border-gray-200 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center"
             >
-              <option value="all">Tous</option>
-              <option value="active">Actifs</option>
-              <option value="inactive">Inactifs</option>
-            </select>
+              <FiFilter className="mr-2 h-4 w-4" />
+              Filtres
+            </button>
+            
+            {showFilterMenu && (
+              <div className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-md shadow-lg">
+                <div className="py-1 rounded-md bg-white shadow-xs">
+                  <div className="px-4 py-2 text-sm text-gray-700">
+                    <span>Statut:</span>
+                  </div>
+                  <div className="px-4 py-2">
+                    <select
+                      value={filterActive === null ? 'all' : filterActive ? 'active' : 'inactive'}
+                      onChange={(e) => {
+                        if (e.target.value === 'all') setFilterActive(null);
+                        else setFilterActive(e.target.value === 'active');
+                      }}
+                      className="block w-full py-2 px-3 border border-gray-200 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option value="all">Tous</option>
+                      <option value="active">Actifs</option>
+                      <option value="inactive">Inactifs</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -137,6 +156,7 @@ export default function EventsPage() {
               Créer un événement <span aria-hidden="true">&rarr;</span>
             </Link>
           </div>
+          <p className="text-gray-600">Aucun événement n&apos;a été créé.</p>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -191,11 +211,11 @@ export default function EventsPage() {
                         </Link>
                         
                         <Link href={`/admin/events/${event.id}/edit`} className="text-green-600 hover:text-green-900" title="Modifier">
-                          <FiEdit2 className="h-5 w-5" />
+                          <FiEdit className="h-5 w-5" />
                         </Link>
                         {/* Nouveau bouton pour accéder aux vidéos de l'événement */}
                         <Link href={`/admin/events/${event.id}/videos`} className="text-purple-600 hover:text-purple-900" title="Vidéos">
-                          <FiVideo className="h-5 w-5" />
+                          <FiVideo className="h-4 w-4 mr-1" />
                         </Link>
                         <button 
                           onClick={() => handleDelete(event.id)} 
@@ -217,7 +237,7 @@ export default function EventsPage() {
                           className="text-gray-500 hover:text-gray-700"
                           title="Copier l'URL"
                         >
-                          <FiCopy className="h-5 w-5" />
+                          <FiCopy className="mr-1 h-4 w-4" />
                         </button>
                         <button 
                           onClick={() => setSelectedQR({id: event.id, url: getEventUrl(event.id)})} 
@@ -241,12 +261,12 @@ export default function EventsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">QR Code pour l'événement</h3>
+              <h3 className="text-lg font-medium">QR Code événement</h3>
               <button 
                 onClick={() => setSelectedQR(null)}
                 className="text-gray-500 hover:text-gray-700"
               >
-                <FiX className="h-5 w-5" />
+                <FiX className="h-6 w-6" />
               </button>
             </div>
             <div className="flex flex-col items-center">
@@ -256,12 +276,16 @@ export default function EventsPage() {
                 onClick={() => copyToClipboard(selectedQR.url)}
                 className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center"
               >
-                <FiCopy className="mr-2" /> Copier l'URL
+                <FiCopy className="mr-1" /> Copier l&apos;URL
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <p className="text-sm text-gray-600 mt-3">
+        L&apos;URL suivante permet aux participants d&apos;accéder à l&apos;événement:
+      </p>
     </div>
   );
 }

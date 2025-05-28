@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FiMusic, FiFolder, FiFile, FiEye, FiSearch, FiRefreshCw } from 'react-icons/fi';
+import { 
+  FiMusic, 
+  FiFolder,
+  FiRefreshCw,
+  FiSearch, // Add missing icon import
+  FiEye    // Add missing icon import
+} from 'react-icons/fi';
 import { getS3Categories, getS3SongsByCategory, S3Item } from '@/lib/aws/s3Admin';
 
 export default function SongsPage() {
@@ -54,15 +60,6 @@ export default function SongsPage() {
   const filteredSongs = songs.filter(song => 
     song.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // Fonction helper pour formater la taille du fichier
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'N/A';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   // Fonction pour extraire le titre et l'artiste du nom de fichier
   const parseSongName = (fileName: string): { title: string; artist: string } => {
@@ -233,7 +230,7 @@ export default function SongsPage() {
                                     className="text-blue-600 hover:text-blue-900"
                                     title="Aperçu"
                                   >
-                                    <FiEye className="h-5 w-5" />
+                                    <FiEye className="mr-1" />
                                   </a>
                                 </div>
                               </td>

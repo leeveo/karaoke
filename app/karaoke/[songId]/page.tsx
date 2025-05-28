@@ -91,7 +91,7 @@ export default function KaraokePage() {
           <div className="w-20 h-20 border-t-4 border-b-4 border-purple-500 border-solid rounded-full animate-spin mx-auto"></div>
           
           <p className="text-white mt-6 text-xl font-light tracking-wider">
-            Chargement de <span className="font-bold text-purple-400">"{songName}"</span>
+            Chargement de <span className="font-bold text-purple-400">{songName}</span>
           </p>
           
           {/* Vidéo cachée pour le préchargement */}

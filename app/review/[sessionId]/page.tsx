@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { uploadToS3 } from '../../../lib/aws'; // Fixed import path with relative reference
+import Image from 'next/image';
 
 export default function ReviewPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export default function ReviewPage() {
         router.push(`/qr/${sessionId}?pageUrl=${encodeURIComponent(s3Url)}`);
       } else {
         // Handle upload failure
-        setUploadError("Impossible de sauvegarder la vidéo en ligne - mais vous pouvez continuer avec une version temporaire");
+        setUploadError("Impossible d&apos;enregistrer la vidéo en ligne - mais vous pouvez continuer avec une version temporaire");
         setIsUploading(false);
       }
     } catch (error) {
@@ -126,10 +127,12 @@ export default function ReviewPage() {
             {/* Logo overlay */}
             {logoLoaded && logoRef.current && (
               <div className="absolute bottom-6 right-6 z-10 pointer-events-none">
-                <img 
+                <Image
                   src={logoRef.current.src} 
-                  alt="Logo" 
-                  className="w-24 md:w-32 opacity-85"
+                  alt="Logo"
+                  width={200}
+                  height={200}
+                  className="max-w-full max-h-full object-contain"
                 />
               </div>
             )}
@@ -181,7 +184,7 @@ export default function ReviewPage() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
             </svg>
-            Retour à l'accueil
+            Retour Accueil
           </button>
           
           <button

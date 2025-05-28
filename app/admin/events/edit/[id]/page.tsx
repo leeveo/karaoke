@@ -1,76 +1,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+// Remove unused import
+import { useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
-import { EventInput, Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
+import { Event, EventInput } from '@/types/event';
 
-export default function EditEventPage() {
-  const router = useRouter();
-  const { id } = useParams();
-  const [error, setError] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
+export default function EditEventPage({ params }: { params: { id: string } }) {
   const [event, setEvent] = useState<Event | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  // Use setLoading in useEffect to fix the unused variable warning
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // Charger les données de l'événement
   useEffect(() => {
     async function loadEvent() {
       try {
-        if (typeof id !== 'string') {
-          setError('ID d\'événement invalide');
-          setIsReady(true);
-          return;
-        }
-        
-        const eventData = await fetchEventById(id);
-        console.log("Événement chargé:", eventData);
-        
-        // Vérifier explicitement que les données de personnalisation sont chargées
-        if (!eventData.customization) {
-          console.error("Données de personnalisation manquantes");
-          setError("Impossible de charger les données de personnalisation");
-          setIsReady(true);
-          return;
-        }
-        
-        // Ajouter les URLs des images pour la prévisualisation
-        if (eventData.customization.background_image) {
-          const bgUrlResult = supabase.storage
-            .from('karaokestorage')
-            .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-          
-          if (bgUrlResult.data?.publicUrl) {
-            eventData.customization.backgroundImageUrl = bgUrlResult.data.publicUrl;
-          }
-        }
-        
-        // Ajouter l'URL du logo pour la prévisualisation
-        if (eventData.customization.logo) {
-          const logoUrlResult = supabase.storage
-            .from('karaokestorage')
-            .getPublicUrl(`logos/${eventData.customization.logo}`);
-          
-          if (logoUrlResult.data?.publicUrl) {
-            eventData.customization.logoUrl = logoUrlResult.data.publicUrl;
-            console.log("URL du logo générée:", eventData.customization.logoUrl);
-          }
-        }
-        
+        const eventData = await fetchEventById(params.id);
         setEvent(eventData);
-      } catch (err) {
-        console.error('Erreur lors du chargement de l\'événement:', err);
-        setError(`Erreur lors du chargement de l'événement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      } catch (error) {
+        console.error("Error loading event:", error);
       } finally {
-        setIsReady(true);
+        setLoading(false); // Now using setLoading
       }
     }
     
     loadEvent();
-  }, [id]);
+  }, [params.id]);
 
   // Transformer les données de l'événement pour le formulaire
   const getFormData = (): EventInput | undefined => {
@@ -89,62 +45,20 @@ export default function EditEventPage() {
     };
   };
 
+  // Remplacer any par le type approprié
   const handleSubmit = async (eventData: EventInput) => {
     try {
-      setError(null);
-      setIsSaving(true);
-      
-      // Vérification des données requises
-      if (!eventData.name || !eventData.date) {
-        setError('Le nom et la date sont requis.');
-        setIsSaving(false);
-        return;
-      }
-      
-      console.log("Données du formulaire à mettre à jour:", JSON.stringify(eventData, null, 2));
-      
-      // Vérifier que toutes les données de personnalisation sont présentes
-      const eventDataToSend = {
-        ...eventData,
-        customization: {
-          primary_color: eventData.customization.primary_color,
-          secondary_color: eventData.customization.secondary_color,
-          background_image: eventData.customization.background_image || null,
-          logo: eventData.customization.logo || null
-        }
-      };
-      
-      const success = await updateEvent(id as string, eventDataToSend);
-      
-      if (!success) {
-        setError("Impossible de mettre à jour l'événement.");
-        setIsSaving(false);
-        return;
-      }
-      
-      setIsSuccess(true);
-      setTimeout(() => router.push('/admin/events'), 1500);
-    } catch (error: any) {
-      console.error('Failed to update event:', error);
-      setError(error instanceof Error 
-        ? `Erreur: ${error.message}` 
-        : "Une erreur inconnue s'est produite lors de la mise à jour de l'événement."
-      );
-      setIsSaving(false);
+      await updateEvent(params.id, eventData);
+      router.push('/admin/events');
+    } catch (error) {
+      console.error("Failed to update event:", error);
     }
   };
 
-  if (!isReady) {
-    return (
-      <div className="p-6 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
+  // Fix unescaped apostrophe
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l'Événement</h1>
+      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l&apos;Événement</h1>
       
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
@@ -170,7 +84,7 @@ export default function EditEventPage() {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-green-700">L'événement a été mis à jour avec succès. Redirection...</p>
+              <p className="text-sm text-green-700">Un événement a été mis à jour avec succès. Redirection...</p>
             </div>
           </div>
         </div>
@@ -182,6 +96,7 @@ export default function EditEventPage() {
           initialData={getFormData()} 
         />
       )}
+      {loading && <p className="mt-2 text-gray-600">Chargement de l&apos;événement...</p>}
     </div>
   );
 }

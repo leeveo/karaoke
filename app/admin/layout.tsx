@@ -17,7 +17,7 @@ export default function AdminLayout({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { Canvas: QRCanvas } = useQRCode();
+  const { /* Canvas: QRCanvas */ } = useQRCode();
 
   // Rediriger /admin vers /admin/dashboard
   useEffect(() => {

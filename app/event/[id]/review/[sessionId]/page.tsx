@@ -12,7 +12,6 @@ export default function EventReviewPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showUploadLoader, setShowUploadLoader] = useState(false);
@@ -95,7 +94,7 @@ export default function EventReviewPage() {
 
       // Convert back to hex
       return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
+    } catch {
       return color; // Return original color if any error occurs
     }
   }
@@ -108,7 +107,6 @@ export default function EventReviewPage() {
     logo.onload = () => {
       console.log('Review page: Logo loaded successfully');
       logoRef.current = logo;
-      setLogoLoaded(true);
     };
     
     logo.onerror = () => {
@@ -119,7 +117,6 @@ export default function EventReviewPage() {
       
       altLogo.onload = () => {
         logoRef.current = altLogo;
-        setLogoLoaded(true);
       };
     };
   }, []);
@@ -336,7 +333,7 @@ export default function EventReviewPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>
-              Retour à l'événement
+              Retour
             </button>
             
             <button

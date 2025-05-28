@@ -7,12 +7,18 @@ interface FiltersSelectorProps {
   className?: string;
 }
 
+interface Lens {
+  id: string;
+  name: string;
+  // Add other properties as needed based on the lens structure
+}
+
 export default function FiltersSelector({ className = '' }: FiltersSelectorProps) {
   const { lenses, applyLens, removeLens, currentLens, isLoading } = useCameraKit();
   const [isOpen, setIsOpen] = useState(false);
   
   // Gérer la sélection d'un filtre
-  const handleFilterSelect = (lens: any | null) => {
+  const handleFilterSelect = (lens: Lens | null) => {
     if (lens === null) {
       console.log("Removing filter");
       removeLens();

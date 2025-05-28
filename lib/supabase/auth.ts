@@ -1,5 +1,12 @@
 import { supabase } from './client';
 
+// Define proper error types to replace 'any'
+interface AuthError {
+  message: string;
+  status?: number;
+  code?: string;
+}
+
 // Fonction pour connecter un utilisateur
 export async function signIn(email: string, password: string) {
   try {
@@ -17,9 +24,12 @@ export async function signIn(email: string, password: string) {
     
     console.log('Connexion réussie:', data.user);
     return { user: data.user, error: null };
-  } catch (error: any) {
-    console.error('Erreur lors de la connexion:', error);
-    return { user: null, error: error.message };
+  } catch (error: unknown) {
+    // Convert unknown error to typed error
+    const authError: AuthError = {
+      message: error instanceof Error ? error.message : 'An unknown error occurred during sign in'
+    };
+    return { user: null, error: authError };
   }
 }
 
@@ -48,8 +58,12 @@ export async function signUp(email: string, password: string) {
     }
     
     return { user: data.user, error: null };
-  } catch (error: any) {
-    return { user: null, error: error.message };
+  } catch (error: unknown) {
+    // Convert unknown error to typed error
+    const authError: AuthError = {
+      message: error instanceof Error ? error.message : 'An unknown error occurred during sign up'
+    };
+    return { user: null, error: authError };
   }
 }
 

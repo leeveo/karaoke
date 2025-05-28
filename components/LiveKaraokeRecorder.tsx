@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MusicTransitionLoader from './MusicTransitionLoader';
 import { CameraKitProvider } from '../contexts/CameraKitContext';
 import { useCameraKit } from '../hooks/useCameraKit';
 import { fetchEventById } from '@/lib/supabase/events';
 import { supabase } from '@/lib/supabase/client';
+import { Event } from '@/types/event';
 
 interface ButtonStyles {
   className?: string;
@@ -47,7 +48,7 @@ function LiveKaraokeRecorderInner({
   const audioDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const playingRef = useRef<boolean>(false);
   const logoRef = useRef<HTMLImageElement | null>(null);
-  const cameraKitContainerRef = useRef<HTMLDivElement>(null); // Ajout de la référence manquante
+  const cameraKitContainerRef = useRef<HTMLDivElement>(null);
   
   // Navigation
   const router = useRouter();
@@ -57,30 +58,23 @@ function LiveKaraokeRecorderInner({
   const [recordingStarted, setRecordingStarted] = useState(false);
   const [webcamReady, setWebcamReady] = useState(false);
   const [karaokeReady, setKaraokeReady] = useState(false);
-  const [logoLoaded, setLogoLoaded] = useState(false); // This is the first declaration
+  const [logoLoaded, setLogoLoaded] = useState(false);
   const [status, setStatus] = useState<string>("Initialisation...");
-  const [debug, setDebug] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStep, setProcessingStep] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [useSnapFilters, setUseSnapFilters] = useState(false); // Activé par défaut
+  const [useSnapFilters, setUseSnapFilters] = useState(false);
   
   // Utiliser le contexte CameraKit
   const { 
-    lenses, 
-    isInitialized, 
-    applyLens, 
-    currentLens,
-    drawFilteredImage,
+    isInitialized,
     setWebcamElement,
     session,
     cameraKitReady
   } = useCameraKit();
 
-  // État pour l'événement et le logo
-  const [event, setEvent] = useState<any>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  // Remove the duplicate logoLoaded state declaration
+  // État pour l'événement et son logo
+  const [event, setEvent] = useState<Event | null>(null);
   
   // Charger l'événement et son logo
   useEffect(() => {
@@ -106,9 +100,6 @@ function LiveKaraokeRecorderInner({
               const logoUrl = publicUrlResult.data.publicUrl;
               console.log("Logo URL generated:", logoUrl);
               
-              // Stocker l'URL dans l'état
-              setLogoUrl(logoUrl);
-              
               // Pré-charger le logo
               const img = new Image();
               img.crossOrigin = "anonymous";
@@ -118,8 +109,8 @@ function LiveKaraokeRecorderInner({
                 logoRef.current = img;
                 setLogoLoaded(true);
               };
-              img.onerror = (e) => {
-                console.error("Failed to load logo from Supabase:", e);
+              img.onerror = () => {
+                console.error("Failed to load logo from Supabase");
                 // Essayer de charger le logo par défaut
                 loadDefaultLogo();
               };
@@ -153,8 +144,8 @@ function LiveKaraokeRecorderInner({
         setLogoLoaded(true);
       };
       
-      logo.onerror = (e) => {
-        console.error('Error loading default logo:', e);
+      logo.onerror = () => {
+        console.error('Error loading default logo');
         
         // Essayer des chemins alternatifs
         const paths = ['/logo.png', '/images/logo.png', '/assets/logo.png'];
@@ -188,40 +179,28 @@ function LiveKaraokeRecorderInner({
     loadEventAndLogo();
   }, [eventId]);
 
-  // Intercepteur d'erreurs pour éviter les erreurs liées à play()
+  // Intercepteur d'erreurs amélioré pour éviter les erreurs liées à play()
   useEffect(() => {
     const originalConsoleError = console.error;
     
-    console.error = (...args) => {
-      const errorText = args.map(arg => String(arg)).join(' ');
-      
-      if ((errorText.includes('play()') && 
-           (errorText.includes('interrupted') || 
-            errorText.includes('failed') ||
-            errorText.includes('load request'))) ||
-          errorText.includes('https://goo.gl/LdLk22')) {
-        return;
+    console.error = function(...args) {
+      const errorMessage = args.join(' ');
+      if (
+        errorMessage.includes('play() request was interrupted') ||
+        errorMessage.includes('https://goo.gl/LdLk22') ||
+        errorMessage.includes('play() failed') ||
+        (errorMessage.includes('play()') && 
+         (errorMessage.includes('interrupted') || 
+          errorMessage.includes('failed') ||
+          errorMessage.includes('load request')))
+      ) {
+        return; // Supprimer ces erreurs spécifiques
       }
-      
-      originalConsoleError.apply(console, args);
-    };
-    
-    const originalWindowOnError = window.onerror;
-    
-    window.onerror = function(message, source, lineno, colno, error) {
-      if (String(message).includes('play()') && 
-          String(message).includes('interrupted')) {
-        return true;
-      }
-      
-      return originalWindowOnError 
-        ? originalWindowOnError.apply(this, arguments as any) 
-        : false;
+      return originalConsoleError.apply(console, args);
     };
     
     return () => {
       console.error = originalConsoleError;
-      window.onerror = originalWindowOnError;
     };
   }, []);
 
@@ -362,7 +341,7 @@ function LiveKaraokeRecorderInner({
           return;
         }
         
-        // 6. Fonction de dessin
+        // 6. Fonction de dessin avec logo toujours visible
         const drawFrame = () => {
           if (!canvasRef.current) return;
           
@@ -418,7 +397,7 @@ function LiveKaraokeRecorderInner({
               ctx.globalAlpha = 1.0; // Restaurer l'opacité
             }
             
-            // Ajouter le logo en dernier
+            // Toujours afficher le logo, qu'on soit en enregistrement ou non
             if (logoRef.current && logoLoaded) {
               // Logo plus grand et plus visible
               const logoWidth = canvasRef.current.width * 0.20;
@@ -443,7 +422,7 @@ function LiveKaraokeRecorderInner({
                 logoRef.current,
                 logoX, logoY, logoWidth, logoHeight
               );
-            } else if (recordingStarted) {
+            } else {
               // Fallback si le logo n'est pas disponible
               ctx.save();
               
@@ -507,6 +486,88 @@ function LiveKaraokeRecorderInner({
     };
   }, [karaokeSrc, router, songId, useSnapFilters, setWebcamElement, session]);
 
+  // Charger directement un logo par défaut lors du premier render
+  useEffect(() => {
+    // Logo toujours disponible même sans événement
+    const preloadDefaultLogo = () => {
+      console.log("Preloading default logo");
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      logo.src = '/logo/logo.png';
+      
+      logo.onload = () => {
+        console.log('Default logo loaded successfully');
+        logoRef.current = logo;
+        setLogoLoaded(true);
+      };
+      
+      logo.onerror = () => {
+        console.error('Error loading default logo');
+        
+        // Essayer des chemins alternatifs dans l'ordre
+        const alternateLogos = [
+          '/logo.png', 
+          '/images/logo.png', 
+          '/assets/logo.png',
+          '/public/logo.png',
+          '/public/logo/logo.png'
+        ];
+        
+        let loadedAny = false;
+        
+        alternateLogos.forEach(path => {
+          if (!loadedAny) {
+            const altLogo = new Image();
+            altLogo.crossOrigin = "anonymous";
+            altLogo.src = path;
+            
+            altLogo.onload = () => {
+              if (!loadedAny) {
+                console.log(`Logo loaded from alternate path: ${path}`);
+                logoRef.current = altLogo;
+                setLogoLoaded(true);
+                loadedAny = true;
+              }
+            };
+          }
+        });
+        
+        // Fallback simple logo si rien ne marche
+        if (!loadedAny) {
+          console.log("Creating a simple canvas logo");
+          const canvas = document.createElement('canvas');
+          canvas.width = 200;
+          canvas.height = 100;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Draw a simple logo
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, 200, 100);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('KARAOKE APP', 100, 50);
+            ctx.strokeStyle = '#3f83f8';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(5, 5, 190, 90);
+            
+            // Convert canvas to image
+            const img = new Image();
+            img.src = canvas.toDataURL('image/png');
+            img.onload = () => {
+              logoRef.current = img;
+              setLogoLoaded(true);
+            };
+          }
+        }
+      };
+    };
+    
+    // Always load a default logo immediately
+    preloadDefaultLogo();
+  }, []);
+
   // Fonction pour démarrer l'enregistrement
   const startRecording = async () => {
     if (!audioContextRef.current || !karaokeVideoRef.current || !mediaRecorderRef.current || !audioDestinationRef.current) {
@@ -535,6 +596,48 @@ function LiveKaraokeRecorderInner({
           }
           checkReadyState();
         });
+      }
+      
+      // Forcer le chargement du logo si ce n'est pas encore fait
+      if (!logoLoaded && !logoRef.current) {
+        console.log("Chargement forcé du logo avant l'enregistrement");
+        
+        // Fonction pour charger le logo par défaut en cas d'erreur
+        const loadDefaultLogo = () => {
+          const logo = new Image();
+          logo.crossOrigin = "anonymous";
+          logo.src = '/logo/logo.png';
+          
+          return new Promise<void>((resolve) => {
+            logo.onload = () => {
+              console.log('Default logo loaded successfully before recording');
+              logoRef.current = logo;
+              setLogoLoaded(true);
+              resolve();
+            };
+            
+            logo.onerror = () => {
+              console.error('Error loading default logo');
+              // Try alternate path
+              const altLogo = new Image();
+              altLogo.crossOrigin = "anonymous";
+              altLogo.src = '/logo.png';
+              
+              altLogo.onload = () => {
+                logoRef.current = altLogo;
+                setLogoLoaded(true);
+                resolve();
+              };
+              
+              altLogo.onerror = () => {
+                // Just continue even without logo
+                resolve();
+              };
+            };
+          });
+        };
+        
+        await loadDefaultLogo();
       }
       
       // Réinitialiser les chunks d'enregistrement
@@ -570,32 +673,57 @@ function LiveKaraokeRecorderInner({
       karaokeVideoRef.current.currentTime = 0;
       mediaElement.currentTime = 0;
       
-      // Démarrer l'enregistrement
+      // Démarrer l'enregistrement AVANT de lancer la lecture
+      console.log("Starting MediaRecorder...");
       mediaRecorderRef.current.start();
       setRecordingStarted(true);
       
+      // Petit délai pour s'assurer que l'enregistrement est bien démarré
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       // Démarrer la lecture avec gestion d'erreur
       try {
+        console.log("Starting video playback...");
+        const playPromise = karaokeVideoRef.current.play();
+        
+        // Gérer la promesse de lecture de manière robuste
+        if (playPromise !== undefined) {
+          try {
+            await playPromise;
+            console.log("Karaoke video playing successfully");
+          } catch (e) {
+            console.warn("Première tentative de lecture vidéo échouée, nouvelle tentative...", e);
+            await karaokeVideoRef.current!.play().catch(() => {
+              console.warn("Second attempt also failed, continuing anyway");
+              // Continue anyway, the audio might still work
+            });
+          }
+        }
+        
+        // Court délai entre le démarrage de la vidéo et de l'audio
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        await karaokeVideoRef.current.play().catch(e => {
-          console.warn("Première tentative de lecture vidéo échouée, nouvelle tentative...", e);
-          return karaokeVideoRef.current!.play();
+        console.log("Starting audio playback...");
+        await mediaElement.play().catch(() => {
+          console.warn("Audio playback failed, continuing anyway");
         });
-        
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        await mediaElement.play();
         
         setStatus("Enregistrement en cours");
       } catch (playError) {
         console.error("Erreur lors de la lecture:", playError);
         alert("Veuillez interagir avec la page pour autoriser la lecture audio");
+        // Ne pas arrêter l'enregistrement - l'utilisateur pourrait interagir et l'audio démarrera
       }
     } catch (err) {
       console.error("Erreur au démarrage de l'enregistrement:", err);
       setStatus(`Erreur: ${err instanceof Error ? err.message : "démarrage"}`);
       playingRef.current = false;
+      
+      // S'assurer que l'enregistrement est arrêté en cas d'erreur
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setRecordingStarted(false);
     }
   };
   
@@ -742,7 +870,7 @@ function LiveKaraokeRecorderInner({
               <span className="flex items-center justify-center gap-2">
                 {buttonIcon && <span className="mr-1">{buttonIcon}</span>}
                 <span className={webcamReady && karaokeReady && !playingRef.current ? "w-3 h-3 rounded-full bg-white animate-pulse" : "hidden"}></span>
-                <span>{buttonText}</span>
+                {buttonText && <span>{buttonText}</span>}
               </span>
             </button>
           </div>
@@ -766,7 +894,6 @@ function LiveKaraokeRecorderInner({
         }}
       >
         {status}
-        {/* Remove filter status */}
       </div>
       
       {/* Bouton "Arrêter l'enregistrement" */}
@@ -780,7 +907,7 @@ function LiveKaraokeRecorderInner({
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <rect x="6" y="6" width="8" height="8" />
             </svg>
-            <span>Arrêter l'enregistrement</span>
+            <span>Arrêter l&apos;enregistrement</span>
           </button>
         </div>
       )}
@@ -801,7 +928,6 @@ function LiveKaraokeRecorderInner({
             }}>
               Vidéo: {karaokeReady ? "✅" : "❌"}
             </span>
-            {/* Remove filter status indicator */}
           </div>
         </div>
       )}

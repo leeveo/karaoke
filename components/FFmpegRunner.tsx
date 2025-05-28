@@ -64,7 +64,7 @@ await ffmpeg.exec([
   
   
 
-      const data = (await ffmpeg.readFile('final.mp4')) as any;
+      const data = await ffmpeg.readFile('final.mp4') as Uint8Array;
       const finalBlob = new Blob([data.buffer], { type: 'video/mp4' });
       const finalUrl = URL.createObjectURL(finalBlob);
 

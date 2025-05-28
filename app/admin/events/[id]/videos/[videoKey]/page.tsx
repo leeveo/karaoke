@@ -71,7 +71,8 @@ export default function VideoPlayerPage() {
         || 'Vidéo';
         
       return songName;
-    } catch (_) { // Fixed: Use underscore for unused variable
+    } catch {
+      // Removed the unused 'error' parameter
       return "Vidéo";
     }
   };

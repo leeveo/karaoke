@@ -8,9 +8,6 @@ import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import { supabase } from '@/lib/supabase/client';
 
-// Ajouter l'importation du package snap camera-kit au début du fichier
-// IMPORTANT: Exécuter "npm install @snap/camera-kit" pour installer le package
-
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
   const decodedSongId = decodeURIComponent(songId as string);
@@ -25,6 +22,109 @@ export default function EventKaraokePage() {
   
   // Extraire le nom de la chanson à partir de l'ID
   const songName = decodedSongId.split('/').pop()?.split('.')[0] || decodedSongId;
+
+  // "Retour" button handler - Make sure to include the event ID
+  const handleReturn = () => {
+    if (id) {
+      router.push(`/event/${id}`);
+    } else {
+      router.push('/'); // Fallback to home if no ID
+    }
+  };
+
+  // Fix unused 'e' parameter in adjustColorLightness function
+  function adjustColorLightness(color: string, percent: number): string {
+    try {
+      // Convert hex to RGB
+      let r = parseInt(color.substring(1,3), 16);
+      let g = parseInt(color.substring(3,5), 16);
+      let b = parseInt(color.substring(5,7), 16);
+
+      // Adjust lightness
+      r = Math.min(255, Math.max(0, r + (r * percent / 100)));
+      g = Math.min(255, Math.max(0, g + (g * percent / 100)));
+      b = Math.min(255, Math.max(0, b + (b * percent / 100)));
+
+      // Convert back to hex
+      return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
+    } catch {
+      return color; // Return original color if any error occurs
+    }
+  }
+
+  // Fix unused 'e' parameter in hexToRgba function
+  function hexToRgba(hex: string, alpha: number): string {
+    try {
+      // Convertir hex en RGB
+      const r = parseInt(hex.substring(1,3), 16);
+      const g = parseInt(hex.substring(3,5), 16);
+      const b = parseInt(hex.substring(5,7), 16);
+      
+      // Retourner la valeur rgba
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    } catch {
+      return `rgba(3, 52, 185, ${alpha})`; // Valeur par défaut si erreur
+    }
+  }
+
+  // Move useEffect hooks to the top level
+  useEffect(() => {
+    async function loadVideo() {
+      try {
+        setLoading(true);
+        setVideoReady(false);
+        
+        // Vérifier si c'est un chemin local ou un chemin S3
+        if (decodedSongId.startsWith('karaokesaas/')) {
+          // C'est une chanson S3, il faut obtenir l'URL signée
+          console.log("Chargement depuis S3:", decodedSongId);
+          const s3Url = await getSongUrl(decodedSongId);
+          
+          if (s3Url) {
+            console.log("URL S3 générée avec succès");
+            setVideoUrl(s3Url);
+            
+            // Précharger la vidéo avant de la montrer
+            if (preloadRef.current) {
+              preloadRef.current.src = s3Url;
+              preloadRef.current.load();
+              
+              // Attendre que la vidéo soit prête
+              preloadRef.current.oncanplaythrough = () => {
+                console.log("Vidéo préchargée avec succès");
+                setVideoReady(true);
+                setLoading(false);
+              };
+              
+              preloadRef.current.onerror = (e) => {
+                console.error("Erreur lors du préchargement de la vidéo:", e);
+                setError("Impossible de précharger la vidéo");
+                setLoading(false);
+              };
+            } else {
+              // Pas de référence - continuer sans préchargement
+              setLoading(false);
+            }
+          } else {
+            setError("Impossible de générer l'URL de la vidéo depuis S3");
+            setLoading(false);
+          }
+        } else {
+          // Chemin local
+          const localPath = `/songs/${decodedSongId}`;
+          setVideoUrl(localPath);
+          setVideoReady(true);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Erreur lors du chargement de la vidéo:", err);
+        setError(`Erreur lors du chargement de la vidéo: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+        setLoading(false);
+      }
+    }
+
+    loadVideo();
+  }, [decodedSongId]);
 
   // Charger l'événement et ses personnalisations
   useEffect(() => {
@@ -101,109 +201,7 @@ export default function EventKaraokePage() {
     loadEvent();
   }, [id]);
 
-  // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
-  function adjustColorLightness(color: string, percent: number): string {
-    try {
-      // Convert hex to RGB
-      let r = parseInt(color.substring(1,3), 16);
-      let g = parseInt(color.substring(3,5), 16);
-      let b = parseInt(color.substring(5,7), 16);
-
-      // Adjust lightness
-      r = Math.min(255, Math.max(0, r + (r * percent / 100)));
-      g = Math.min(255, Math.max(0, g + (g * percent / 100)));
-      b = Math.min(255, Math.max(0, b + (b * percent / 100)));
-
-      // Convert back to hex
-      return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch (e) {
-      return color; // Return original color if any error occurs
-    }
-  }
-
-  // Nouvelle fonction pour convertir une couleur hexadécimale en rgba
-  function hexToRgba(hex: string, alpha: number): string {
-    try {
-      // Convertir hex en RGB
-      const r = parseInt(hex.substring(1,3), 16);
-      const g = parseInt(hex.substring(3,5), 16);
-      const b = parseInt(hex.substring(5,7), 16);
-      
-      // Retourner la valeur rgba
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    } catch (e) {
-      return `rgba(3, 52, 185, ${alpha})`; // Valeur par défaut si erreur
-    }
-  }
-
-  useEffect(() => {
-    async function loadVideo() {
-      try {
-        setLoading(true);
-        setVideoReady(false);
-        
-        // Vérifier si c'est un chemin local ou un chemin S3
-        if (decodedSongId.startsWith('karaokesaas/')) {
-          // C'est une chanson S3, il faut obtenir l'URL signée
-          console.log("Chargement depuis S3:", decodedSongId);
-          const s3Url = await getSongUrl(decodedSongId);
-          
-          if (s3Url) {
-            console.log("URL S3 générée avec succès");
-            setVideoUrl(s3Url);
-            
-            // Précharger la vidéo avant de la montrer
-            if (preloadRef.current) {
-              preloadRef.current.src = s3Url;
-              preloadRef.current.load();
-              
-              // Attendre que la vidéo soit prête
-              preloadRef.current.oncanplaythrough = () => {
-                console.log("Vidéo préchargée avec succès");
-                setVideoReady(true);
-                setLoading(false);
-              };
-              
-              preloadRef.current.onerror = (e) => {
-                console.error("Erreur lors du préchargement de la vidéo:", e);
-                setError("Impossible de précharger la vidéo");
-                setLoading(false);
-              };
-            } else {
-              // Pas de référence - continuer sans préchargement
-              setLoading(false);
-            }
-          } else {
-            setError("Impossible de générer l'URL de la vidéo depuis S3");
-            setLoading(false);
-          }
-        } else {
-          // Chemin local
-          const localPath = `/songs/${decodedSongId}`;
-          setVideoUrl(localPath);
-          setVideoReady(true);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Erreur lors du chargement de la vidéo:", err);
-        setError(`Erreur lors du chargement de la vidéo: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-        setLoading(false);
-      }
-    }
-
-    loadVideo();
-  }, [decodedSongId]);
-
-  // "Retour" button handler - Make sure to include the event ID
-  const handleReturn = () => {
-    if (id) {
-      router.push(`/event/${id}`);
-    } else {
-      router.push('/'); // Fallback to home if no ID
-    }
-  };
-
-  // État de chargement avec design moderne
+  // Render content conditionally at the end
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8"
@@ -225,7 +223,7 @@ export default function EventKaraokePage() {
           <div className="w-20 h-20 border-t-4 border-b-4 border-purple-500 border-solid rounded-full animate-spin mx-auto"></div>
           
           <p className="text-white mt-6 text-xl font-light tracking-wider">
-            Chargement de <span className="font-bold text-purple-400">"{songName}"</span>
+            Chargement de <span className="font-bold text-purple-400"> {songName} </span>
           </p>
           
           {/* Vidéo cachée pour le préchargement */}
@@ -243,14 +241,13 @@ export default function EventKaraokePage() {
               boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
             }}
           >
-            Retour à l'événement
+            Retour 
           </button>
         </div>
       </div>
     );
   }
 
-  // État d'erreur avec design moderne
   if (error || !videoUrl) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8"
@@ -272,22 +269,23 @@ export default function EventKaraokePage() {
             onClick={handleReturn}
             className="mt-8 bg-white text-red-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all transform hover:scale-105 font-medium shadow-lg flex items-center justify-center mx-auto"
           >
-            ← Retour à l'événement
+            ← Retour événement
           </button>
         </div>
       </div>
     );
   }
 
-  // Vue principale avec design moderne
+  // Main content
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8"
       style={{
-        backgroundImage: event?.customization?.backgroundImageUrl 
+        backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
           ? `url('${event.customization.backgroundImageUrl}')` 
           : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
         backgroundSize: "cover",
-        backgroundPosition: "center"
+        backgroundPosition: "center",
+        transition: "background-image 0.5s ease-in-out"
       }}>
       {/* Overlay avec dégradé */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
@@ -316,7 +314,7 @@ export default function EventKaraokePage() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
             </svg>
-            <span>Retour à l'événement</span>
+            <span>Retour événement</span>
           </button>
         </div>
         
@@ -337,7 +335,7 @@ export default function EventKaraokePage() {
                   buttonStyles={{
                     className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
                     icon: "🎵",
-                    text: "Commencer l'enregistrement ! "
+                    text: "" // Removed the text here
                   }}
                 />
               </div>

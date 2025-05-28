@@ -2,17 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-// Remove unused router import
 import { 
   FiMusic, 
   FiCalendar, 
   FiBarChart2, 
-  FiUsers,
   FiPlus,
   FiEye,
   FiExternalLink,
   FiRefreshCw
-  // Remove unused icon imports
 } from 'react-icons/fi';
 import { fetchEvents } from '@/lib/supabase/events';
 import { getS3Categories, getS3SongsByCategory } from '@/lib/aws/s3Admin';
@@ -74,23 +71,16 @@ export default function AdminDashboard() {
     return `${baseUrl}/event/${eventId}`;
   };
 
-  // Remove unused function or just comment it out
-  // const getEventBackgroundUrl = (event: Event) => {
-  //   if (event?.customization?.background_image) {
-  //     try {
-  //       const publicUrlResult = supabase.storage
-  //         .from('karaokestorage')
-  //         .getPublicUrl(`backgrounds/${event.customization.background_image}`);
-  //       
-  //       if (publicUrlResult.data?.publicUrl) {
-  //         return publicUrlResult.data.publicUrl;
-  //       }
-  //     } catch (error) {
-  //       console.error("Error getting background URL:", error);
-  //     }
-  //   }
-  //   return null; // Return null if no background image
-  // };
+  // Fonction pour obtenir l'URL d'une image de fond depuis Supabase
+  const getBackgroundImageUrl = (filename: string | undefined) => {
+    if (!filename) return undefined;
+    
+    const { data } = supabase.storage
+      .from('karaokestorage')
+      .getPublicUrl(`backgrounds/${filename}`);
+    
+    return data?.publicUrl;
+  };
 
   // Remove unused function or just comment it out
   // const countVideosByEvent = (videos: { name: string }[]): Record<string, number> => {
@@ -238,14 +228,14 @@ export default function AdminDashboard() {
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundImage: event.customization?.background_image 
-                      ? `url(${event.customization.background_image})` 
+                      ? `url(${getBackgroundImageUrl(event.customization.background_image)})` 
                       : undefined,
                   }}
                 >
                   {event.customization?.background_image && (
                     <div className="absolute inset-0 bg-black/40 z-0" />
                   )}
-                  <div className="relative z-10 w-full flex flex-col items-center">
+                  <div className="relative w-full flex flex-col items-center">
                     <span
                       className="block text-2xl font-bold text-center shadow"
                       style={{
@@ -411,7 +401,7 @@ export default function AdminDashboard() {
             </span>
           </div>
           <p className="mt-2 text-sm text-green-600">
-            Consultez les statistiques d'utilisation de l'application
+            Consultez les statistiques 
           </p>
           <div className="mt-4">
             <Link 
