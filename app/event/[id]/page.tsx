@@ -5,19 +5,20 @@ import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import CategorySelector from '@/components/CategorySelector';
 import { motion } from 'framer-motion';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import Image from 'next/image';
 
-export default function EventPage() {
-  // Use useParams instead of receiving params as props
-  const params = useParams();
-  const id = params.id as string;
-  const router = useRouter();
+export default function EventPage({ params }: { params: { id: string } }) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const router = useRouter();
+
+  // Properly unwrap the params object using React.use()
+  const unwrappedParams = React.use(params);
+  const id = unwrappedParams.id;
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
   function adjustColorLightness(color: string, percent: number): string {
