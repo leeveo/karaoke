@@ -116,7 +116,7 @@ export default function LoginPage() {
           {!isSupabaseConfigured && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
               <p className="text-yellow-700">
-                Configuration Supabase incomplète. Les fonctionnalités d'authentification peuvent ne pas fonctionner correctement.
+                Configuration Supabase incomplète. Les fonctionnalités d&apos;authentification peuvent ne pas fonctionner correctement.
               </p>
             </div>
           )}
@@ -176,7 +176,7 @@ export default function LoginPage() {
                 href="/"
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
-                Retour à l'accueil
+                Retour à l&apos;accueil
               </Link>
             </div>
           </form>
