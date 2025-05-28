@@ -1,294 +1,157 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import Link from 'next/link';
-import Image from 'next/image'; // Add this import for Next.js Image component
-import { FiArrowLeft, FiEdit, FiExternalLink } from 'react-icons/fi';
+import { supabase } from '@/lib/supabase/client';
 
-export default function ViewEventPage({ params }: { params: { id: string } }) {
+export default function ViewEventPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
+
+  // Helper function to get the background image URL
+  const getBackgroundImageUrl = (filename: string | undefined) => {
+    if (!filename) return undefined;
+    
+    const { data } = supabase.storage
+      .from('karaokestorage')
+      .getPublicUrl(`backgrounds/${filename}`);
+    
+    return data?.publicUrl;
+  };
 
   useEffect(() => {
     async function loadEvent() {
       try {
-        const eventData = await fetchEventById(params.id);
+        const eventData = await fetchEventById(id);
         setEvent(eventData);
-      } catch (error) { // Change variable name from 'err' to 'error' to use it
-        console.error("Error loading event:", error);
-        setError('Cet événement n&apos;existe pas ou n&apos;est plus disponible.');
+      } catch (error) {
+        console.error('Failed to load event:', error);
       } finally {
         setLoading(false);
       }
     }
     
     loadEvent();
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="spinner"></div>
-          <p className="ml-3">Chargement en cours...</p>
-        </div>
+      <div className="p-6 text-center">
+        <div className="spinner"></div>
+        <p className="mt-2 text-gray-600">Chargement de l&apos;événement...</p>
       </div>
     );
   }
 
-  if (error || !event) {
+  if (!event) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 text-red-500 p-4 rounded-lg">
-          <h2 className="text-lg font-medium mb-2">Erreur</h2>
-          <p>{error || 'Cet événement n&apos;est pas disponible.'}</p>
-          <div className="mt-4">
-            <Link href="/admin/events" className="text-blue-500 hover:underline flex items-center">
-              <FiArrowLeft className="mr-1" /> Retour à la liste des événements
-            </Link>
-          </div>
-        </div>
+      <div className="p-6 text-center">
+        <p className="text-red-500">Événement non trouvé</p>
+        <Link href="/admin/events" className="mt-4 inline-block text-blue-500 hover:underline">
+          Retour à la liste des événements
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center">
-          <Link href="/admin/events" className="mr-4 text-gray-600 hover:text-gray-900">
-            <FiArrowLeft size={20} />
-          </Link>
-          <h1 className="text-2xl font-semibold text-gray-800">Aperçu </h1>
-        </div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-800">Détails de l&apos;événement</h1>
         <div className="flex space-x-3">
           <Link 
-            href={`/admin/events/${params.id}/edit`} 
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            href="/admin/events" 
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
           >
-            <FiEdit className="mr-2" /> Modifier
+            Retour
           </Link>
           <Link 
-            href={`/event/${params.id}`} 
-            target="_blank"
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            href={`/admin/events/${id}/edit`} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            <FiExternalLink className="mr-2" /> Voir en public
+            Modifier
           </Link>
         </div>
       </div>
 
-      {/* Détails de l'événement */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">Informations générales</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Nom de l&apos;événement</h3>
-                <p className="text-lg">{event.name}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                <p className="text-base">{event.description || 'Aucune description disponible'}</p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Date et heure</h3>
-                  <p className="text-base">
-                    {new Date(event.date).toLocaleDateString('fr-FR', { 
-                      day: 'numeric', 
-                      month: 'long', 
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Lieu</h3>
-                  <p className="text-base">{event.location || 'Non spécifié'}</p>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Statut</h3>
-                <div className="mt-1">
-                  <span className={`px-3 py-1 text-sm rounded-full ${event.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {event.is_active ? 'Actif' : 'Inactif'}
-                  </span>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">URL publique</h3>
-                <div className="mt-1 flex items-center">
-                  <input 
-                    type="text" 
-                    value={`${window.location.origin}/event/${event.id}`}
-                    readOnly
-                    className="flex-1 p-2 border rounded-md text-sm bg-gray-50"
-                  />
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/event/${event.id}`);
-                      alert('URL copiée dans le presse-papier');
-                    }}
-                    className="ml-2 px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-sm"
-                  >
-                    Copier
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        {/* Event header with background */}
+        <div 
+          className="h-40 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center relative"
+          style={event.customization?.background_image ? {
+            backgroundImage: `url(${getBackgroundImageUrl(event.customization.background_image)})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          } : {}}
+        >
+          {event.customization?.background_image && (
+            <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          )}
+          <h2 className="text-3xl font-bold text-white relative z-10">{event.name}</h2>
         </div>
-        
-        <div>
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">Personnalisation</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Couleur primaire</h3>
-                <div className="flex items-center mt-1">
-                  <div 
-                    className="w-8 h-8 rounded-md mr-2" 
-                    style={{ backgroundColor: event.customization?.primary_color || '#FF5733' }}
-                  ></div>
-                  <span>{event.customization?.primary_color || '#FF5733'}</span>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Couleur secondaire</h3>
-                <div className="flex items-center mt-1">
-                  <div 
-                    className="w-8 h-8 rounded-md mr-2" 
-                    style={{ backgroundColor: event.customization?.secondary_color || '#3498DB' }}
-                  ></div>
-                  <span>{event.customization?.secondary_color || '#3498DB'}</span>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Image d&apos;arrière-plan</h3>
-                {event.customization?.background_image ? (
-                  <div className="mt-2">
-                    <div className="relative w-full h-40 rounded-md overflow-hidden">
-                      {/* Replace img with Next.js Image component */}
-                      <Image 
-                        src={event.customization.background_image} 
-                        alt="Background" 
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-gray-500 mt-1">Image par défaut utilisée</p>
-                )}
-              </div>
+
+        {/* Event details */}
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Informations</h3>
+              <p><span className="font-medium">Date:</span> {new Date(event.date).toLocaleDateString()}</p>
+              <p><span className="font-medium">Lieu:</span> {event.location || 'Non spécifié'}</p>
+              <p><span className="font-medium">Statut:</span> {event.is_active ? 'Actif' : 'Inactif'}</p>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">Métadonnées</h2>
-            
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Créé le</span>
-                <span className="font-mono text-xs">{new Date(event.created_at).toLocaleDateString('fr-FR')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">ID</span>
-                <span className="font-mono text-xs">{event.id}</span>
-              </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Personnalisation</h3>
+              {event.customization ? (
+                <>
+                  <div className="flex items-center mb-2">
+                    <span className="font-medium mr-2">Couleur primaire:</span>
+                    <div className="w-6 h-6 rounded-full" style={{ backgroundColor: event.customization.primary_color }}></div>
+                    <span className="ml-2">{event.customization.primary_color}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="font-medium mr-2">Couleur secondaire:</span>
+                    <div className="w-6 h-6 rounded-full" style={{ backgroundColor: event.customization.secondary_color }}></div>
+                    <span className="ml-2">{event.customization.secondary_color}</span>
+                  </div>
+                </>
+              ) : (
+                <p>Aucune personnalisation définie</p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Fix unescaped apostrophes */}
-      <p className="text-sm text-gray-500 mb-4">
-        L&apos;interface de l&apos;événement tel que les participants la verront
-      </p>
+      <div className="mt-6 bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Partage</h3>
+        <div className="flex flex-col md:flex-row items-center justify-between">
+          <div>
+            <p className="mb-2">URL de l&apos;événement:</p>
+            <div className="bg-gray-100 p-3 rounded text-sm font-mono break-all">
+              {typeof window !== 'undefined' ? `${window.location.origin}/event/${event.id}` : `/event/${event.id}`}
+            </div>
+          </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">Aperçu</h2>
-        
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Nom de l&apos;événement</h3>
-            <p className="text-lg">{event.name}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Description</h3>
-            <p className="text-base">{event.description || 'Aucune description disponible'}</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Date et heure</h3>
-              <p className="text-base">
-                {new Date(event.date).toLocaleDateString('fr-FR', { 
-                  day: 'numeric', 
-                  month: 'long', 
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Lieu</h3>
-              <p className="text-base">{event.location || 'Non spécifié'}</p>
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Statut</h3>
-            <div className="mt-1">
-              <span className={`px-3 py-1 text-sm rounded-full ${event.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {event.is_active ? 'Actif' : 'Inactif'}
-              </span>
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">URL publique</h3>
-            <div className="mt-1 flex items-center">
-              <input 
-                type="text" 
-                value={`${window.location.origin}/event/${event.id}`}
-                readOnly
-                className="flex-1 p-2 border rounded-md text-sm bg-gray-50"
-              />
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/event/${event.id}`);
-                  alert('URL copiée dans le presse-papier');
-                }}
-                className="ml-2 px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-sm"
-              >
-                Copier
-              </button>
-            </div>
+          <div className="mt-4 md:mt-0">
+            <Link 
+              href={`/event/${event.id}`} 
+              target="_blank"
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6.672 1.911a1 1 0 10-1.932.518l.259.966a1 1 0 001.932-.518l-.26-.966zM2.429 4.74a1 1 0 10-.517 1.932l.966.259a1 1 0 00.517-1.932l-.966-.26zm8.814-.569a1 1 0 00-1.415-1.414l-.707.707a1 1 0 101.415 1.415l.707-.708zm-7.071 7.072l.707-.707A1 1 0 003.465 9.12l-.708.707a1 1 0 001.415 1.415zm3.2-5.171a1 1 0 00-1.3 1.3l4 10a1 1 0 001.823.075l1.38-2.759 3.018 3.02a1 1 0 001.414-1.415l-3.019-3.02 2.76-1.379a1 1 0 00-.076-1.822l-10-4z" clipRule="evenodd" />
+              </svg>
+              Voir l&apos;événement
+            </Link>
           </div>
         </div>
-        
-        <p className="text-sm text-gray-500">
-          Cliquez sur le bouton ci-dessus pour ouvrir l&apos;événement dans un nouvel onglet
-        </p>
       </div>
     </div>
   );
