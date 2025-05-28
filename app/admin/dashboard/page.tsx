@@ -24,6 +24,7 @@ export default function AdminDashboard() {
     activeEvents: 0,
     totalSongs: 0,
     totalCategories: 0,
+    popularEvents: [] // Add this property to the initial state
   });
   const [loading, setLoading] = useState(true);
   const { Canvas: QRCanvas } = useQRCode();
@@ -449,7 +450,7 @@ export default function AdminDashboard() {
       {/* Événements populaires - Graphique */}
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="font-medium text-gray-800">Événements populaires</h3>
-        <PopularEventsChart events={stats.popularEvents || []} />
+        <PopularEventsChart events={stats.popularEvents} />
       </div>
     </div>
   );
