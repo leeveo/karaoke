@@ -466,15 +466,24 @@ export default function EventVideosAdminPage() {
               </div>
               
               <div className="mt-3 flex justify-end">
-                <a
-                  href={signedVideoUrl || ''}
-                  download
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center disabled:opacity-50"
-                  disabled={!signedVideoUrl}
-                >
-                  <FiDownload className="mr-2" />
-                  Télécharger
-                </a>
+                {/* Replace the anchor with disabled attribute */}
+                {signedVideoUrl ? (
+                  <a
+                    href={signedVideoUrl}
+                    download
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center"
+                  >
+                    <FiDownload className="mr-2" />
+                    Télécharger
+                  </a>
+                ) : (
+                  <span
+                    className="bg-green-600 opacity-50 cursor-not-allowed text-white px-4 py-2 rounded flex items-center"
+                  >
+                    <FiDownload className="mr-2" />
+                    Télécharger
+                  </span>
+                )}
               </div>
             </div>
           </div>
