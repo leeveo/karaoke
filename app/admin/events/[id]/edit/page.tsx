@@ -1,22 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
 import { Event, EventInput } from '@/types/event';
 
-// Fixed props definition to work correctly with Next.js App Router client components
-type EditEventPageProps = {
-  params: { id: string }
-  searchParams?: Record<string, string | string[] | undefined>
-}
-
-export default function EditEventPage({ params }: EditEventPageProps) {
+export default function EditEventPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { id } = params;
+  const params = useParams();
+  const id = params.id as string;
 
   useEffect(() => {
     async function loadEvent() {
