@@ -1,13 +1,12 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MusicTransitionLoader from './MusicTransitionLoader';
 import { CameraKitProvider } from '../contexts/CameraKitContext';
 import { useCameraKit } from '../hooks/useCameraKit';
 import { fetchEventById } from '@/lib/supabase/events';
 import { supabase } from '@/lib/supabase/client';
-import { Event } from '@/types/event';
 
 interface ButtonStyles {
   className?: string;
@@ -17,7 +16,6 @@ interface ButtonStyles {
 
 interface LiveKaraokeRecorderProps {
   karaokeSrc: string;
-  preloaded?: boolean;
   eventId?: string;
   buttonStyles?: ButtonStyles;
 }
@@ -34,7 +32,6 @@ function LiveKaraokeRecorderWithCameraKit(props: LiveKaraokeRecorderProps) {
 // Composant interne qui utilise le hook useCameraKit
 function LiveKaraokeRecorderInner({ 
   karaokeSrc, 
-  preloaded = false,
   eventId,
   buttonStyles = {} 
 }: LiveKaraokeRecorderProps) {
@@ -73,9 +70,6 @@ function LiveKaraokeRecorderInner({
     cameraKitReady
   } = useCameraKit();
 
-  // État pour l'événement et son logo
-  const [event, setEvent] = useState<Event | null>(null);
-  
   // Charger l'événement et son logo
   useEffect(() => {
     if (!eventId) return;
@@ -84,7 +78,6 @@ function LiveKaraokeRecorderInner({
       try {
         console.log("Loading event data for logo:", eventId);
         const eventData = await fetchEventById(eventId);
-        setEvent(eventData);
         
         // Vérifier si un logo existe
         if (eventData?.customization?.logo) {
@@ -232,7 +225,7 @@ function LiveKaraokeRecorderInner({
             setStatus(webcamReady ? "Prêt à enregistrer" : "En attente de la webcam...");
           };
           
-          karaokeVideoRef.current.onerror = (e) => {
+          karaokeVideoRef.current.onerror = () => {  // Remove unused 'e' parameter here
             console.error("Erreur vidéo:", karaokeVideoRef.current?.error);
             setStatus(`Erreur vidéo: ${karaokeVideoRef.current?.error?.message || 'inconnue'}`);
           };
