@@ -37,6 +37,23 @@ export default function EditEventPage() {
     }
   };
 
+  // Convert Event to EventInput for the form
+  const prepareFormData = (event: Event): EventInput => {
+    return {
+      name: event.name,
+      date: event.date,
+      location: event.location || '',
+      is_active: event.is_active,
+      // Ensure customization is not null
+      customization: event.customization || {
+        primary_color: '#0334b9',
+        secondary_color: '#2fb9db',
+        background_image: '',
+        logo: ''
+      }
+    };
+  };
+
   if (loading) {
     return (
       <div className="p-6 text-center">
@@ -57,7 +74,7 @@ export default function EditEventPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l&apos;Événement</h1>
-      <EventForm onSubmit={handleSubmit} initialData={event} />
+      <EventForm onSubmit={handleSubmit} initialData={prepareFormData(event)} />
     </div>
   );
 }
