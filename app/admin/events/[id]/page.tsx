@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation'; // Remove unused router import
 import Link from 'next/link';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
@@ -10,7 +10,6 @@ import { supabase } from '@/lib/supabase/client';
 export default function EventDetailsPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
