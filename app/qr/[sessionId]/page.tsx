@@ -3,6 +3,7 @@
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useEffect, useState } from 'react';
+import { getSongUrl } from '@/services/s3Service';
 
 export default function QRPage() {
   const searchParams = useSearchParams();
@@ -27,7 +28,8 @@ export default function QRPage() {
             
             // Try to get a fresh signed URL
             try {
-              const newSignedUrl = await getSignedUrl(path);
+              // Use the imported getSongUrl function instead of the undefined getSignedUrl
+              const newSignedUrl = await getSongUrl(path);
               if (newSignedUrl) {
                 console.log("Generated new signed URL");
                 setPageUrl(newSignedUrl);
@@ -353,7 +355,6 @@ export default function QRPage() {
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
                       borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
                     }}
                     placeholder="Entrez votre nom"
                   />
@@ -371,8 +372,7 @@ export default function QRPage() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="votre@email.com"
                   />

@@ -454,10 +454,9 @@ export default function EventQRPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm rounded-lg border-2 text-white placeholder-gray-300"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="Entrez votre nom"
                   />
@@ -473,10 +472,9 @@ export default function EventQRPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
-                    style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm rounded-lg border-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    style={{
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="votre@email.com"
                   />

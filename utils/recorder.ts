@@ -43,3 +43,10 @@ export async function stopRecording(): Promise<Blob> {
     mediaRecorder.stop();
   });
 }
+
+// Add HTMLVideoElement extension to add the missing captureStream method
+declare global {
+  interface HTMLVideoElement {
+    captureStream(frameRate?: number): MediaStream;
+  }
+}

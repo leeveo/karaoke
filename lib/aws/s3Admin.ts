@@ -7,6 +7,7 @@ export interface S3Item {
   name: string;
   category?: string;
   path: string;
+  url?: string; // Propriété URL ajoutée
   size?: number;
   lastModified?: Date;
 }

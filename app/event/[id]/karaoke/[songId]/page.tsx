@@ -330,7 +330,6 @@ export default function EventKaraokePage() {
               <div className="rounded-xl overflow-hidden flex justify-center">
                 <LiveKaraokeRecorder 
                   karaokeSrc={videoUrl} 
-                  preloaded={true} 
                   eventId={id as string} 
                   buttonStyles={{
                     className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",

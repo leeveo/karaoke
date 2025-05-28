@@ -66,9 +66,11 @@ function LiveKaraokeRecorderInner({
   const { 
     isInitialized,
     setWebcamElement,
-    session,
-    cameraKitReady
+    session
   } = useCameraKit();
+
+  // Create a derived state for camera readiness
+  const cameraKitReady = isInitialized && !!session;
 
   // Charger l'événement et son logo
   useEffect(() => {

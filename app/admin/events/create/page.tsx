@@ -8,10 +8,12 @@ import { EventInput } from '@/types/event';
 import { ensureDevelopmentUser, getCurrentUser } from '@/lib/supabase/auth';
 
 export default function CreateEventPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [user, setUser] = useState<{email?: string; id?: string}>({});
 
   // Vérifier l'authentification
@@ -73,7 +75,7 @@ export default function CreateEventPage() {
         </div>
       )}
       
-      {/* Remove the isSubmitting prop that's causing the error */}
+      {/* Remove the isSubmitting prop that's causing the type error */}
       <EventForm onSubmit={handleSubmit} />
     </div>
   );

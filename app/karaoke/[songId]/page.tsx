@@ -145,13 +145,12 @@ export default function KaraokePage() {
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-2xl pointer-events-none"></div>
               
               <div className="rounded-xl overflow-hidden flex justify-center">
-                <LiveKaraokeRecorder 
-                  karaokeSrc={videoUrl} 
-                  preloaded={true} 
+                <LiveKaraokeRecorder
+                  karaokeSrc={videoUrl}
                   buttonStyles={{
                     className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
                     icon: "🎵",
-                    text: "Commencer l'enregistrement"
+                    text: "Commencer"
                   }}
                 />
               </div>

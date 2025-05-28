@@ -65,7 +65,9 @@ await ffmpeg.exec([
   
 
       const data = await ffmpeg.readFile('final.mp4') as Uint8Array;
-      const finalBlob = new Blob([data.buffer], { type: 'video/mp4' });
+      // Fix the type error by passing the Uint8Array directly to the Blob constructor
+      // instead of using its buffer property
+      const finalBlob = new Blob([data], { type: 'video/mp4' });
       const finalUrl = URL.createObjectURL(finalBlob);
 
       onDone(finalUrl);

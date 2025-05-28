@@ -9,7 +9,6 @@ export default function ReviewPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const { sessionId } = useParams();
@@ -17,24 +16,23 @@ export default function ReviewPage() {
 
   // Load logo for display
   useEffect(() => {
-    const logo = new Image();
+    // Use the global window.Image constructor to avoid TypeScript errors
+    const logo = new window.Image();
     logo.src = '/logo/logo.png';
     
     logo.onload = () => {
       console.log('Review page: Logo loaded successfully');
       logoRef.current = logo;
-      setLogoLoaded(true);
     };
     
     logo.onerror = () => {
       console.error('Review page: Error loading logo');
       // Try alternate path
-      const altLogo = new Image();
+      const altLogo = new window.Image();
       altLogo.src = '/logo.png';
       
       altLogo.onload = () => {
         logoRef.current = altLogo;
-        setLogoLoaded(true);
       };
     };
   }, []);
@@ -125,7 +123,7 @@ export default function ReviewPage() {
             />
             
             {/* Logo overlay */}
-            {logoLoaded && logoRef.current && (
+            {logoRef.current && (
               <div className="absolute bottom-6 right-6 z-10 pointer-events-none">
                 <Image
                   src={logoRef.current.src} 

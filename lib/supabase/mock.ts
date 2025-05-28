@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { Event, EventInput } from '@/types/event';
 
 // Données fictives pour les événements
@@ -53,26 +52,28 @@ export async function fetchEventById(id: string): Promise<Event> {
   return { ...event };
 }
 
-export async function createEvent(eventInput: EventInput): Promise<string> {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  const newId = uuidv4();
-  const newEvent: Event = {
+// Fix createEvent function to match Event type requirements
+export function createEvent(eventInput: EventInput): string {
+  const newId = Math.random().toString(36).substring(2, 15);
+  
+  const newEvent = {
     id: newId,
     name: eventInput.name,
-    description: eventInput.description,
     date: eventInput.date,
-    location: eventInput.location,
+    location: '', // Add missing required property
     created_at: new Date().toISOString(),
     user_id: 'user123',
-    is_active: eventInput.is_active,
+    is_active: true,
     customization: {
       event_id: newId,
-      primary_color: eventInput.primary_color,
-      secondary_color: eventInput.secondary_color,
-      background_image: eventInput.background_image,
+      primary_color: eventInput.customization?.primary_color || '#0334b9',
+      secondary_color: eventInput.customization?.secondary_color || '#2fb9db',
+      background_image: eventInput.customization?.background_image || '',
+      logo: '', // Add logo property as it might be required
     },
   };
-  mockEvents.push(newEvent);
+  
+  mockEvents.push(newEvent as Event); // Cast to Event type to ensure compatibility
   return newId;
 }
 
@@ -83,20 +84,22 @@ export async function updateEvent(id: string, eventInput: EventInput): Promise<v
     throw new Error('Event not found');
   }
   
-  mockEvents[eventIndex] = {
+  // In the updateEvent function
+  const updatedEvent = {
     ...mockEvents[eventIndex],
     name: eventInput.name,
-    description: eventInput.description,
     date: eventInput.date,
-    location: eventInput.location,
-    is_active: eventInput.is_active,
+    is_active: true,
     customization: {
       event_id: id,
-      primary_color: eventInput.primary_color,
-      secondary_color: eventInput.secondary_color,
-      background_image: eventInput.background_image,
+      // Access properties through the customization object
+      primary_color: eventInput.customization?.primary_color || '#0334b9',
+      secondary_color: eventInput.customization?.secondary_color || '#2fb9db',
+      background_image: eventInput.customization?.background_image || null,
     },
   };
+
+  mockEvents[eventIndex] = updatedEvent;
 }
 
 export async function deleteEvent(id: string): Promise<void> {
