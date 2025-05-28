@@ -6,15 +6,12 @@ import EventForm from '@/components/forms/EventForm';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
 import { Event, EventInput } from '@/types/event';
 
-// Properly define the page props to match Next.js App Router expectations
-interface EditEventPageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
+// Fixed props definition to work correctly with Next.js App Router client components
+type EditEventPageProps = {
+  params: { id: string }
+  searchParams?: Record<string, string | string[] | undefined>
 }
 
-// Update the component signature to use the proper props interface
 export default function EditEventPage({ params }: EditEventPageProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
