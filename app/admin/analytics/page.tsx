@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { 
   FiCalendar,
   FiRefreshCw,
@@ -60,7 +60,7 @@ interface EventStats {
   date: string;
 }
 
-export default function AnalyticsPage() {
+function AnalyticsContent() {
   // États pour gérer les données
   const [stats, setStats] = useState({
     totalEvents: 0,
@@ -664,6 +664,18 @@ export default function AnalyticsPage() {
           <p>• Pour voir toutes les vidéos d&apos;un événement spécifique, cliquez sur &quot;Voir toutes les vidéos&quot;.</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
+      
+      <Suspense fallback={<div>Loading analytics data...</div>}>
+        <AnalyticsContent />
+      </Suspense>
     </div>
   );
 }
