@@ -1,11 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-
 export default function DashboardContent() {
-  const _searchParams = useSearchParams(); // Prefix with underscore to indicate intentionally unused
-  
-  // Your dashboard content
   return (
     <div>
       {/* Dashboard cards and widgets */}
