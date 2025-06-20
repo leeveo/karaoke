@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { 
   FiMusic, 
@@ -17,7 +17,7 @@ import { Event } from '@/types/event';
 import { useQRCode } from 'next-qrcode';
 import { supabase } from '@/lib/supabase/client';
 
-export default function AdminDashboard() {
+const DashboardContent = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [stats, setStats] = useState({
     totalEvents: 0,
@@ -462,6 +462,18 @@ export default function AdminDashboard() {
         <h3 className="font-medium text-gray-800">Événements populaires</h3>
         <PopularEventsChart events={stats.popularEvents || []} />
       </div>
+    </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      
+      <Suspense fallback={<div>Loading dashboard data...</div>}>
+        <DashboardContent />
+      </Suspense>
     </div>
   );
 }
