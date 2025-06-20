@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { FiMenu, FiBell, FiUser, FiSettings } from 'react-icons/fi';
-import { useRouter } from 'next/navigation';
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -8,7 +7,6 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const router = useRouter();
 
   return (
     <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 lg:px-6">
