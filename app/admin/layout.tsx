@@ -63,9 +63,11 @@ export default function AdminLayout({
           />
           
           <main className="p-6">
-            <Suspense fallback={<div className="flex items-center justify-center w-full h-full">
-              <div className="text-lg">Loading...</div>
-            </div>}>
+            <Suspense fallback={
+              <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="text-lg text-gray-600">Chargement en cours...</div>
+              </div>
+            }>
               {children}
             </Suspense>
           </main>
