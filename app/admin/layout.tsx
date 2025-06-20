@@ -28,9 +28,9 @@ export default function AdminLayout({
 
   useEffect(() => {
     async function checkAuth() {
-      const user = await getCurrentUser();
+      // Remove unused variable
+      await getCurrentUser();
       
-      // Removed redirect to login page
       // Simply set loading to false regardless of auth status
       setIsLoading(false);
     }
