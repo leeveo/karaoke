@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { getCurrentUser } from '@/lib/supabase/auth';
 import { useQRCode } from 'next-qrcode';
 import { LoaderProvider } from '@/components/PageTransitionLoader';
 import AdminSidebar from '@/components/admin/AdminSidebar';
@@ -15,7 +14,6 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { /* Canvas: QRCanvas */ } = useQRCode();
 
@@ -25,30 +23,6 @@ export default function AdminLayout({
       router.replace('/admin/dashboard');
     }
   }, [pathname, router]);
-
-  useEffect(() => {
-    async function checkAuth() {
-      const user = await getCurrentUser();
-      
-      if (!user) {
-        // Rediriger vers la page de connexion si l'utilisateur n'est pas connecté
-        router.replace('/auth/login');
-        return;
-      }
-      
-      setIsLoading(false);
-    }
-    
-    checkAuth();
-  }, [router]);
-
-  if (isLoading) {
-    return (
-      <div className="p-6 flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   // Déterminer quel onglet est actuellement actif
   const getActiveTab = () => {

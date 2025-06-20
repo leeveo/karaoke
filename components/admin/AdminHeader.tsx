@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { FiMenu, FiBell, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
-import { signOut } from '@/lib/supabase/auth';
+import { FiMenu, FiBell, FiUser, FiSettings } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 
 interface AdminHeaderProps {
@@ -10,11 +9,6 @@ interface AdminHeaderProps {
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const router = useRouter();
-
-  const handleLogout = async () => {
-    await signOut();
-    router.push('/auth/login');
-  };
 
   return (
     <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 lg:px-6">
@@ -61,14 +55,6 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
                   <FiSettings className="mr-2 h-4 w-4" />
                   Paramètres
                 </a>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  role="menuitem"
-                >
-                  <FiLogOut className="mr-2 h-4 w-4" />
-                  Se déconnecter
-                </button>
               </div>
             </div>
           )}
