@@ -1,8 +1,6 @@
 'use client';
 
 export default function AnalyticsContent() {
-  // Remove useSearchParams() if not needed, or use it properly here
-  
   return (
     <div>
       {/* Analytics content */}
@@ -10,11 +8,13 @@ export default function AnalyticsContent() {
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4">Usage Statistics</h2>
           {/* Chart or statistics content */}
+          <p>Usage statistics will appear here</p>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4">Popular Songs</h2>
           {/* Popular songs list */}
+          <p>List of popular songs will appear here</p>
         </div>
       </div>
     </div>
