@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useQRCode } from 'next-qrcode';
 import { LoaderProvider } from '@/components/PageTransitionLoader';
 import AdminSidebar from '@/components/admin/AdminSidebar';
@@ -63,7 +63,11 @@ export default function AdminLayout({
           />
           
           <main className="p-6">
-            {children}
+            <Suspense fallback={<div className="flex items-center justify-center w-full h-full">
+              <div className="text-lg">Loading...</div>
+            </div>}>
+              {children}
+            </Suspense>
           </main>
         </div>
       </div>
