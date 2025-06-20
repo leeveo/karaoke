@@ -30,12 +30,8 @@ export default function AdminLayout({
     async function checkAuth() {
       const user = await getCurrentUser();
       
-      if (!user) {
-        // Rediriger vers la page de connexion si l'utilisateur n'est pas connecté
-        router.replace('/auth/login');
-        return;
-      }
-      
+      // Removed redirect to login page
+      // Simply set loading to false regardless of auth status
       setIsLoading(false);
     }
     
