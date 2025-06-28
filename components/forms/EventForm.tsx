@@ -7,6 +7,7 @@ import ColorPicker from '../ui/ColorPicker';
 import TemplateSelector from './TemplateSelector';
 import { fetchTemplates } from '@/lib/supabase/templates';
 import Image from 'next/image';
+import { Template } from '@/types/template'; // Ajout de l'import du type Template
 
 interface EventFormProps {
   onSubmit: (data: EventInput) => void;
@@ -39,8 +40,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   
   // UI state
   const [formError, setFormError] = useState<string | null>(null);
-  const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templates, setTemplates] = useState<Template[]>([]); // Typage explicite du state
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
