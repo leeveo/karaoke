@@ -50,8 +50,9 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
       try {
         const templatesData = await fetchTemplates();
         setTemplates(templatesData);
-      } catch (error) {
-        console.error("Error loading templates:", error);
+      } catch {
+        // Removed unused 'error'
+        console.error("Error loading templates");
       }
     }
     
@@ -152,7 +153,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
           background_image: url, // Écrase l'image de fond du template si upload
         }
       });
-    } catch (error) {
+    } catch {
+      // Removed unused 'error'
       setFormError("Erreur lors de l'upload de l'image de fond");
     }
   };
@@ -202,7 +204,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
           logo: url,
         }
       });
-    } catch (error) {
+    } catch {
+      // Removed unused 'error'
       setFormError("Erreur lors de l'upload du logo");
     }
   };
@@ -215,7 +218,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
 
     // Si le template a une image de fond, on l'utilise comme valeur du champ background_image
     // On suppose que template.background_image est une URL S3 ou un nom de fichier
-    let backgroundImageUrl = template.background_image;
+    const backgroundImageUrl = template.background_image;
     // Si ce n'est pas une URL, on peut éventuellement construire l'URL S3 ici si besoin
     if (backgroundImageUrl && !backgroundImageUrl.startsWith('http')) {
       // Si tu veux forcer l'URL S3, décommente et adapte la ligne suivante :

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { getTemplateImageUrl } from '@/lib/supabase/templates';
 import { Template } from '@/types/template';
 import TemplatePreviewModal from './TemplatePreviewModal';
 import Image from 'next/image';

@@ -261,9 +261,10 @@ export default function EventQRPage() {
   };
 
   // Gérer la soumission du formulaire
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async () => {
+    // e.preventDefault(); // Remove unused parameter and call
+    event?.preventDefault?.(); // Defensive: in case event is passed by mistake
+
     // Validation des champs
     if (!formData.name.trim()) {
       setFormError('Le nom est requis');
@@ -529,7 +530,7 @@ export default function EventQRPage() {
                     color: 'var(--primary-dark)'
                   }}
                 >
-                  <p>Un email contenant votre vidéo karaoké {event ? `de l&apos;événement "${event.name}"` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
+                  <p>Un email contenant votre vidéo karaoké {event ? `de l&apos;événement &quot;${event.name}&quot;` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
                 </div>
 
                 <div className="flex flex-col gap-3 mt-6">

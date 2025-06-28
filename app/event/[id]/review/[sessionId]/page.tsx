@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { uploadToS3 } from '@/lib/aws';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader';  // Ajout de l'import du loader
 
 export default function EventReviewPage() {
