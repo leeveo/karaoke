@@ -261,9 +261,10 @@ export default function EventQRPage() {
   };
 
   // Gérer la soumission du formulaire
-  const handleSubmit = async () => {
-    // e.preventDefault(); // Remove unused parameter and call
-    event?.preventDefault?.(); // Defensive: in case event is passed by mistake
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
 
     // Validation des champs
     if (!formData.name.trim()) {
