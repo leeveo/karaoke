@@ -196,7 +196,7 @@ export default function AdminDashboard() {
       <div className="flex justify-end">
         <button
           onClick={() => window.location.reload()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg shadow hover:from-green-600 hover:to-emerald-700 transition-all font-medium"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-800 to-green-500 text-white rounded-lg shadow hover:from-green-600 hover:to-emerald-700 transition-all font-medium"
         >
           <FiRefreshCw className="h-5 w-5" />
           Actualiser les données

@@ -28,6 +28,7 @@ export default function EventCategoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false); // Nouvel état pour la navigation
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
 
   // Charger l'événement et ses personnalisations
   useEffect(() => {
@@ -36,7 +37,20 @@ export default function EventCategoryPage() {
         if (typeof id === 'string') {
           const eventData = await fetchEventById(id);
           setEvent(eventData);
-          
+
+          // Détermination de l'URL de background_image (S3)
+          let bgUrl = '';
+          if (
+            eventData.customization &&
+            eventData.customization.background_image
+          ) {
+            const bg = eventData.customization.background_image;
+            bgUrl = bg.startsWith('http')
+              ? bg
+              : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
+          }
+          setBackgroundUrl(bgUrl || null);
+
           // Appliquer les couleurs personnalisées
           if (eventData.customization) {
             // S'assurer que les couleurs primaires et secondaires sont bien récupérées
@@ -66,77 +80,14 @@ export default function EventCategoryPage() {
               '--secondary-gradient', 
               `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
             );
-
-            // Fix background image loading - sans bg.png
-            if (eventData.customization.background_image) {
-              console.log("Found background_image:", eventData.customization.background_image);
-              
-              try {
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  console.log("Background image URL generated:", bgUrl);
-                  
-                  // Store the full URL in the event object for rendering
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  
-                  // Preload the image
-                  const img = new Image();
-                  img.src = bgUrl;
-                  img.onload = () => {
-                    console.log("Background image loaded successfully");
-                    document.documentElement.style.setProperty('--bg-image', `url('${bgUrl}')`);
-                    document.documentElement.classList.add('bg-loaded');
-                    setBgLoaded(true);
-                  };
-                  img.onerror = (e) => {
-                    console.error("Failed to load background image:", e);
-                    // Utiliser un dégradé au lieu d'une image par défaut
-                    document.documentElement.style.setProperty(
-                      '--bg-image', 
-                      'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                    );
-                    setBgLoaded(true);
-                  };
-                } else {
-                  console.error("Public URL not available for image:", eventData.customization.background_image);
-                  // Utiliser un dégradé au lieu d'une image par défaut
-                  document.documentElement.style.setProperty(
-                    '--bg-image', 
-                    'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                  );
-                  setBgLoaded(true);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-                // Utiliser un dégradé au lieu d'une image par défaut
-                document.documentElement.style.setProperty(
-                  '--bg-image', 
-                  'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                );
-                setBgLoaded(true);
-              }
-            } else {
-              console.log("No background_image found, using default gradient");
-              // Utiliser un dégradé au lieu d'une image par défaut
-              document.documentElement.style.setProperty(
-                '--bg-image', 
-                'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-              );
-              setBgLoaded(true);
-            }
           }
         }
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
         setError('Événement introuvable');
-        setBgLoaded(true);
       }
     }
-    
+
     loadEvent();
   }, [id]);
 
@@ -212,11 +163,14 @@ export default function EventCategoryPage() {
   if (error) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8"
       style={{
-        backgroundImage: event?.customization?.backgroundImageUrl 
-          ? `url('${event.customization.backgroundImageUrl}')` 
-          : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
-        backgroundSize: "cover",
-        backgroundPosition: "center"
+        ...(backgroundUrl
+          ? {
+              backgroundImage: `url('${backgroundUrl}')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }
+          : {})
       }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
       <div className="relative z-10 bg-red-900/40 backdrop-blur-lg p-6 rounded-xl border border-red-500/30 max-w-md">
@@ -257,12 +211,14 @@ export default function EventCategoryPage() {
         animate={{ opacity: 1 }}
         className="flex flex-col items-center h-screen overflow-hidden"
         style={{
-          backgroundColor: '#080424', // Fond de base
-          backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
-            ? `url('${event.customization.backgroundImageUrl}')` 
-            : 'linear-gradient(135deg, #080424 0%, #160e40 100%)',
-          backgroundSize: "cover",
-          backgroundPosition: "center"
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>

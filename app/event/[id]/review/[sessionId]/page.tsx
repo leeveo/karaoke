@@ -17,6 +17,7 @@ export default function EventReviewPage() {
   const [showUploadLoader, setShowUploadLoader] = useState(false);
   const [uploadStep, setUploadStep] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const { id, sessionId } = useParams();
@@ -29,7 +30,20 @@ export default function EventReviewPage() {
         if (typeof id === 'string') {
           const eventData = await fetchEventById(id);
           setEvent(eventData);
-          
+
+          // Détermination de l'URL de background_image (S3)
+          let bgUrl = '';
+          if (
+            eventData.customization &&
+            eventData.customization.background_image
+          ) {
+            const bg = eventData.customization.background_image;
+            bgUrl = bg.startsWith('http')
+              ? bg
+              : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
+          }
+          setBackgroundUrl(bgUrl || null);
+
           // Appliquer les couleurs personnalisées
           if (eventData.customization) {
             // Couleurs primaires et secondaires
@@ -49,26 +63,6 @@ export default function EventReviewPage() {
               '--secondary-gradient', 
               `linear-gradient(135deg, ${eventData.customization.secondary_color} 0%, ${adjustColorLightness(eventData.customization.secondary_color, 20)} 100%)`
             );
-            
-            // Handle background image properly
-            if (eventData.customization.background_image) {
-              try {
-                // Get public URL from Supabase storage
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  console.log("Background image loaded:", bgUrl);
-                } else {
-                  console.error("Public URL not available for image:", eventData.customization.background_image);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-              }
-            }
           }
         }
       } catch (err) {
@@ -234,12 +228,14 @@ export default function EventReviewPage() {
       {/* Contenu principal de la page */}
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
         style={{
-          backgroundImage: event?.customization?.backgroundImageUrl 
-            ? `url('${event.customization.backgroundImageUrl}')` 
-            : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed"
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
         }}
       >
         {/* Overlay pour améliorer la lisibilité */}

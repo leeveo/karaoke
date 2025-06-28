@@ -30,6 +30,8 @@ export default function EditEventPage() {
 
   const handleSubmit = async (eventData: EventInput) => {
     try {
+      // Log pour debug
+      console.log("EventData envoyé à updateEvent:", eventData);
       await updateEvent(id, eventData);
       router.push('/admin/events');
     } catch (error) {

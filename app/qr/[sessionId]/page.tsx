@@ -10,6 +10,7 @@ export default function QRPage() {
   const { sessionId } = useParams();
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const router = useRouter();
   
   // Get URL from session storage if not in search params
@@ -121,6 +122,32 @@ export default function QRPage() {
         message: `Salut !\n\nJe viens de faire une performance karaoké que j'aimerais partager avec toi.\n\nClique sur le bouton ci-dessous pour la regarder !`
       }));
     }
+
+    // Ajoute la récupération de l'URL de background de l'event si possible
+    const fetchBackground = async () => {
+      // On tente de récupérer l'id de l'event depuis l'URL (si présent dans les query params)
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventId = urlParams.get('eventId');
+      if (eventId) {
+        try {
+          const { fetchEventById } = await import('@/lib/supabase/events');
+          const eventData = await fetchEventById(eventId);
+          if (
+            eventData?.customization &&
+            eventData.customization.background_image
+          ) {
+            const bg = eventData.customization.background_image;
+            const bgUrl = bg.startsWith('http')
+              ? bg
+              : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
+            setBackgroundUrl(bgUrl);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+    fetchBackground();
   }, [pageUrl, router]);
 
   // Gérer le changement des champs du formulaire
@@ -218,7 +245,18 @@ export default function QRPage() {
 
   if (!pageUrl) {
     return (
-      <div className="app-background min-h-screen flex flex-col items-center justify-center">
+      <div className="app-background min-h-screen flex flex-col items-center justify-center"
+        style={{
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
+        }}
+      >
         <div className="bg-black bg-opacity-60 p-8 rounded-lg text-center">
           <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
@@ -230,13 +268,21 @@ export default function QRPage() {
   }
 
   return (
-    <div className="app-background min-h-screen flex flex-col items-center justify-center px-4 py-8"
+    <div
+      className="app-background min-h-screen flex flex-col items-center justify-center px-4 py-8 relative"
       style={{
-        backgroundImage: "linear-gradient(135deg, #080424 0%, #160e40 100%)"
+        ...(backgroundUrl
+          ? {
+              backgroundImage: `url('${backgroundUrl}')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }
+          : {})
       }}
     >
       {/* Overlay léger pour améliorer la lisibilité */}
-      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
       
       {/* Contenu principal */}
       <div className="z-10 w-full max-w-md flex flex-col items-center">

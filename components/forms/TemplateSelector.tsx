@@ -85,7 +85,11 @@ export default function TemplateSelector({
         {templates.map((template) => {
           // Use selectedTemplate.id to check selection
           const isSelected = selectedTemplate?.id === template.id;
-          const imageUrl = getTemplateImageUrl(template.background_image);
+          // Correction stricte : ne jamais préfixer par Supabase si déjà une URL complète
+          let imageUrl = template.background_image;
+          if (imageUrl && !imageUrl.startsWith('http')) {
+            imageUrl = `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke-templates/${imageUrl}`;
+          }
           
           return (
             <div 

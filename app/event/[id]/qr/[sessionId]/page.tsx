@@ -13,16 +13,30 @@ export default function EventQRPage() {
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const router = useRouter();
   
   // Charger l'événement et ses personnalisations
   useEffect(() => {
-    async function loadEvent() {
-      try {
-        if (typeof id === 'string') {
+    async function loadEventAndBackground() {
+      if (typeof id === 'string') {
+        try {
           const eventData = await fetchEventById(id);
           setEvent(eventData);
-          
+
+          // Détermination stricte de l'URL de background_image (S3 ou URL complète)
+          let bgUrl = '';
+          if (
+            eventData?.customization &&
+            eventData.customization.background_image
+          ) {
+            const bg = eventData.customization.background_image;
+            bgUrl = bg.startsWith('http')
+              ? bg
+              : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
+          }
+          setBackgroundUrl(bgUrl || null);
+
           // Appliquer les couleurs personnalisées
           if (eventData.customization) {
             document.documentElement.style.setProperty('--primary-color', eventData.customization.primary_color);
@@ -61,13 +75,13 @@ export default function EventQRPage() {
               }
             }
           }
+        } catch (err) {
+          console.error('Erreur lors du chargement de l\'événement:', err);
         }
-      } catch (err) {
-        console.error('Erreur lors du chargement de l\'événement:', err);
       }
     }
     
-    loadEvent();
+    loadEventAndBackground();
   }, [id]);
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
@@ -301,13 +315,17 @@ export default function EventQRPage() {
   if (!pageUrl) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center"
-          style={{
-            backgroundImage: event?.customization?.backgroundImageUrl 
-              ? `url('${event.customization.backgroundImageUrl}')` 
-              : "url('/bg.png')",
-            backgroundSize: "cover",
-            backgroundPosition: "center"
-          }}>
+        style={{
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
+        }}
+      >
         <div className="bg-black bg-opacity-60 p-8 rounded-lg text-center">
           <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
@@ -320,14 +338,17 @@ export default function EventQRPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
-        style={{
-          backgroundImage: event?.customization?.backgroundImageUrl 
-            ? `url('${event.customization.backgroundImageUrl}')` 
-            : "url('/bg.png')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed"
-        }}>
+      style={{
+        ...(backgroundUrl
+          ? {
+              backgroundImage: `url('${backgroundUrl}')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }
+          : {})
+      }}
+    >
       {/* Overlay léger pour améliorer la lisibilité */}
       <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       

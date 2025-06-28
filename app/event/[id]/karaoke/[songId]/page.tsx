@@ -19,6 +19,7 @@ export default function EventKaraokePage() {
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   
   // Extraire le nom de la chanson à partir de l'ID
   const songName = decodedSongId.split('/').pop()?.split('.')[0] || decodedSongId;
@@ -133,7 +134,20 @@ export default function EventKaraokePage() {
         if (typeof id === 'string') {
           const eventData = await fetchEventById(id);
           setEvent(eventData);
-          
+
+          // Détermination de l'URL de background_image (S3)
+          let bgUrl = '';
+          if (
+            eventData.customization &&
+            eventData.customization.background_image
+          ) {
+            const bg = eventData.customization.background_image;
+            bgUrl = bg.startsWith('http')
+              ? bg
+              : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
+          }
+          setBackgroundUrl(bgUrl || null);
+
           // Appliquer les couleurs personnalisées
           if (eventData.customization) {
             // Couleurs primaires et secondaires
@@ -159,42 +173,10 @@ export default function EventKaraokePage() {
               '--secondary-gradient', 
               `linear-gradient(135deg, ${eventData.customization.secondary_color} 0%, ${adjustColorLightness(eventData.customization.secondary_color, 20)} 100%)`
             );
-            
-            // Background image handling
-            if (eventData.customization.background_image) {
-              try {
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  
-                  // Preload the image
-                  const img = new Image();
-                  img.src = bgUrl;
-                  img.onload = () => {
-                    setBgLoaded(true);
-                  };
-                  img.onerror = () => {
-                    setBgLoaded(true);
-                  };
-                } else {
-                  setBgLoaded(true);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-                setBgLoaded(true);
-              }
-            } else {
-              setBgLoaded(true);
-            }
           }
         }
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
-        setBgLoaded(true);
       }
     }
     
@@ -206,11 +188,14 @@ export default function EventKaraokePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8"
         style={{
-          backgroundImage: event?.customization?.backgroundImageUrl 
-            ? `url('${event.customization.backgroundImageUrl}')` 
-            : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
-          backgroundSize: "cover",
-          backgroundPosition: "center"
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
         }}>
         <div className="absolute inset-0 bg-black bg-opacity-75"></div>
         
@@ -252,11 +237,14 @@ export default function EventKaraokePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8"
         style={{
-          backgroundImage: event?.customization?.backgroundImageUrl 
-            ? `url('${event.customization.backgroundImageUrl}')` 
-            : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
-          backgroundSize: "cover",
-          backgroundPosition: "center"
+          ...(backgroundUrl
+            ? {
+                backgroundImage: `url('${backgroundUrl}')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {})
         }}>
         <div className="absolute inset-0 bg-black bg-opacity-75 backdrop-blur-sm"></div>
         
@@ -280,12 +268,14 @@ export default function EventKaraokePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8"
       style={{
-        backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
-          ? `url('${event.customization.backgroundImageUrl}')` 
-          : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        transition: "background-image 0.5s ease-in-out"
+        ...(backgroundUrl
+          ? {
+              backgroundImage: `url('${backgroundUrl}')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }
+          : {})
       }}>
       {/* Overlay avec dégradé */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>

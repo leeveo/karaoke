@@ -16,16 +16,25 @@ interface EventFormProps {
 const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   // Form state
   const [formValues, setFormValues] = useState<EventInput>(
-    initialData || {
-      name: '',
-      date: new Date().toISOString().split('T')[0],
-      customization: {
-        primary_color: '#0334b9',
-        secondary_color: '#2fb9db',
-        background_image: '',
-        logo: '',
-      }
-    }
+    initialData
+      ? {
+          ...initialData,
+          // Correction : s'assurer que la date est toujours au format "yyyy-MM-dd" pour l'input type="date"
+          date:
+            initialData.date && initialData.date.length > 10
+              ? initialData.date.substring(0, 10)
+              : initialData.date,
+        }
+      : {
+          name: '',
+          date: new Date().toISOString().split('T')[0],
+          customization: {
+            primary_color: '#0334b9',
+            secondary_color: '#2fb9db',
+            background_image: '',
+            logo: '',
+          },
+        }
   );
   
   // UI state
@@ -54,25 +63,26 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     if (initialData) {
       // Vérifier si on a une image de fond
       if (initialData.customization?.background_image) {
-        // Générer l'URL pour la prévisualisation
-        const { data } = supabase.storage
-          .from('karaokestorage')
-          .getPublicUrl(`backgrounds/${initialData.customization.background_image}`);
-          
-        if (data?.publicUrl) {
-          setBackgroundPreview(data.publicUrl);
+        if (initialData.customization.background_image.startsWith('http')) {
+          setBackgroundPreview(initialData.customization.background_image);
+        } else {
+          const { data } = supabase.storage
+            .from('karaokestorage')
+            .getPublicUrl(`backgrounds_users/${initialData.customization.background_image}`);
+          if (data?.publicUrl) {
+            setBackgroundPreview(data.publicUrl);
+          }
         }
       }
-      
+
       // Vérifier si on a un logo
       if (initialData.customization?.logo) {
-        // Générer l'URL pour la prévisualisation
-        const { data } = supabase.storage
-          .from('karaokestorage')
-          .getPublicUrl(`logos/${initialData.customization.logo}`);
-          
-        if (data?.publicUrl) {
-          setLogoPreview(data.publicUrl);
+        // Correction stricte : si c'est déjà une URL, on l'utilise telle quelle
+        if (initialData.customization.logo.startsWith('http')) {
+          setLogoPreview(initialData.customization.logo);
+        } else {
+          // Sinon, on construit l'URL S3 directement
+          setLogoPreview(`https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${initialData.customization.logo}`);
         }
       }
     }
@@ -112,32 +122,37 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     // Create a preview URL
     const previewUrl = URL.createObjectURL(file);
     setBackgroundPreview(previewUrl);
-    
+
     try {
-      // Generate a unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `bg_${Date.now()}.${fileExt}`;
-      
-      // Upload to Supabase Storage
-      const { error } = await supabase.storage
-        .from('karaokestorage')
-        .upload(`backgrounds/${fileName}`, file);
-      
-      if (error) {
-        throw error;
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Ajoute l'id du projet dans le nom du fichier (si dispo)
+      const projectId = formValues.id || formValues.projectId || 'nouveau';
+      formData.append('projectId', projectId);
+
+      // Utilise la route App Router
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        setFormError("Erreur lors de l'upload de l'image de fond (API non trouvée ou erreur serveur)");
+        return;
       }
-      
-      // Update form values
+
+      const { url } = await res.json();
+
+      setBackgroundPreview(url);
       setFormValues({
         ...formValues,
         customization: {
           ...formValues.customization,
-          background_image: fileName
+          background_image: url, // Écrase l'image de fond du template si upload
         }
       });
-      
     } catch (error) {
-      console.error('Error uploading background:', error);
       setFormError("Erreur lors de l'upload de l'image de fond");
     }
   };
@@ -158,32 +173,36 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     setLogoPreview(previewUrl);
     
     try {
-      // Generate a unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `logo_${Date.now()}.${fileExt}`;
-      
-      // Upload to Supabase Storage
-      const { error } = await supabase.storage
-        .from('karaokestorage')
-        .upload(`logos/${fileName}`, file);
-      
-      if (error) {
-        throw error;
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Ajoute l'id du projet dans le nom du fichier (si dispo)
+      // Utilise l'id du projet ou un timestamp si pas encore créé
+      const projectId = formValues.id || formValues.projectId || 'nouveau';
+      formData.append('projectId', projectId);
+
+      // Utilise la même API d'upload S3
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        setFormError("Erreur lors de l'upload du logo (API non trouvée ou erreur serveur)");
+        return;
       }
-      
-      console.log("Logo uploaded successfully:", fileName);
-      
-      // Update form values with the logo filename
+
+      const { url } = await res.json();
+
+      setLogoPreview(url);
       setFormValues({
         ...formValues,
         customization: {
           ...formValues.customization,
-          logo: fileName
+          logo: url,
         }
       });
-      
     } catch (error) {
-      console.error('Error uploading logo:', error);
       setFormError("Erreur lors de l'upload du logo");
     }
   };
@@ -191,46 +210,59 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   // Apply a template to the form
   const handleTemplateSelect = (template) => {
     if (!template) return;
-    
+
     setSelectedTemplate(template);
-    
+
+    // Si le template a une image de fond, on l'utilise comme valeur du champ background_image
+    // On suppose que template.background_image est une URL S3 ou un nom de fichier
+    let backgroundImageUrl = template.background_image;
+    // Si ce n'est pas une URL, on peut éventuellement construire l'URL S3 ici si besoin
+    if (backgroundImageUrl && !backgroundImageUrl.startsWith('http')) {
+      // Si tu veux forcer l'URL S3, décommente et adapte la ligne suivante :
+      // backgroundImageUrl = `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/bg_${backgroundImageUrl}`;
+    }
+
     setFormValues({
       ...formValues,
       customization: {
         ...formValues.customization,
         primary_color: template.primary_color,
         secondary_color: template.secondary_color,
-        background_image: template.background_image
+        background_image: backgroundImageUrl // Écrase l'image de fond actuelle
       }
     });
-    
-    // Update background preview if template has background image
-    if (template.background_image) {
-      const { data } = supabase.storage
-        .from('karaokestorage')
-        .getPublicUrl(`backgrounds/${template.background_image}`);
-        
-      if (data?.publicUrl) {
-        setBackgroundPreview(data.publicUrl);
-      }
+
+    // Affiche la preview de l'image de fond du template
+    if (backgroundImageUrl) {
+      setBackgroundPreview(backgroundImageUrl);
     }
   };
 
   // Form submission handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formValues.name.trim()) {
       setFormError("Le nom de l'événement est requis");
       return;
     }
-    
-    // Log the data being submitted
-    console.log("Submitting form values:", JSON.stringify(formValues, null, 2));
-    
-    // Make sure all fields are present in the customization object
+
+    // Correction stricte du format date (YYYY-MM-DD)
+    let date = formValues.date;
+    if (date) {
+      // Si la date contient un "T", on ne garde que la partie avant
+      if (date.includes('T')) {
+        date = date.split('T')[0];
+      }
+      // Si la date contient des heures ou des secondes, on ne garde que les 10 premiers caractères
+      if (date.length > 10) {
+        date = date.substring(0, 10);
+      }
+    }
+
     const dataToSubmit = {
       ...formValues,
+      date, // toujours au format "YYYY-MM-DD"
       customization: {
         primary_color: formValues.customization.primary_color,
         secondary_color: formValues.customization.secondary_color,
@@ -238,7 +270,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
         logo: formValues.customization.logo || null
       }
     };
-    
+
     onSubmit(dataToSubmit);
   };
 

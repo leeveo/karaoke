@@ -49,7 +49,9 @@ export default function CreateEventPage() {
   const handleSubmit = async (eventData: EventInput) => {
     try {
       setIsSubmitting(true);
-      await createEvent(eventData); // Don't save the unused eventId
+      // Log pour debug
+      console.log("EventData envoyé à createEvent:", eventData);
+      await createEvent(eventData);
       router.push('/admin/events');
     } catch (error) {
       console.error("Error creating event:", error);
