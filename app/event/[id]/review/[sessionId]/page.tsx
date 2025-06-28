@@ -151,14 +151,14 @@ export default function EventReviewPage() {
       // because it was drawn on the canvas during recording
       const response = await fetch(videoUrl);
       const blob = await response.blob();
-      
-      // Nouveau format de nom de fichier qui inclut l'ID de l'événement
-      const filename = `karaoke-videos/event_${id}/${sessionId}-${Date.now()}.webm`;
+
+      // Convert Blob to File for uploadToS3
+      const file = new File([blob], filename, { type: blob.type });
 
       setUploadStep("Sauvegarde de votre performance...");
       setUploadProgress(50);
       console.log("Uploading video with embedded logo to S3...");
-      const s3Url = await uploadToS3(blob, filename);
+      const s3Url = await uploadToS3(file, filename);
       
       if (s3Url) {
         // Successfully uploaded to S3
