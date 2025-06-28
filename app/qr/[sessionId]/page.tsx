@@ -151,10 +151,12 @@ export default function QRPage() {
   }, [pageUrl, router]);
 
   // Gérer le changement des champs du formulaire
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value, type } = event.target;
     const checked = type === 'checkbox' ? (event.target as HTMLInputElement).checked : undefined;
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
