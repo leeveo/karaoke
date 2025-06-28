@@ -24,7 +24,7 @@ export default function AdminDashboard() {
     activeEvents: number;
     totalSongs: number;
     totalCategories: number;
-    popularEvents: Array<{ id: string; name: string; videos: number }>;
+    popularEvents: { id: string; name: string; videos: number }[];
   }>({
     totalEvents: 0,
     activeEvents: 0,
