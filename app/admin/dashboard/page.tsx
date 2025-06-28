@@ -19,12 +19,18 @@ import { supabase } from '@/lib/supabase/client';
 
 export default function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    totalEvents: number;
+    activeEvents: number;
+    totalSongs: number;
+    totalCategories: number;
+    popularEvents: Array<{ id: string; name: string; videos: number }>;
+  }>({
     totalEvents: 0,
     activeEvents: 0,
     totalSongs: 0,
     totalCategories: 0,
-    popularEvents: [] // Add this property to fix the type error
+    popularEvents: []
   });
   const [loading, setLoading] = useState(true);
   const { Canvas: QRCanvas } = useQRCode();
