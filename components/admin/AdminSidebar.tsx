@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   FiGrid, 
-  FiCalendar, 
   FiMusic, 
   FiSettings,
   FiBarChart2,
