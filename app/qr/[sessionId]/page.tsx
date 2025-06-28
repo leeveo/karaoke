@@ -192,9 +192,9 @@ export default function QRPage() {
   };
 
   // Gérer la soumission du formulaire - les champs cachés sont toujours envoyés
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
     // Validation des champs
     if (!formData.name.trim()) {
       setFormError('Le nom est requis');
