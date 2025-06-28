@@ -142,7 +142,7 @@ export default function QRPage() {
               : `https://leeveostockage.s3.eu-west-3.amazonaws.com/karaoke_users/${bg}`;
             setBackgroundUrl(bgUrl);
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       }

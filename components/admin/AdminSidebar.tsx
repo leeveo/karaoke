@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { 
   FiGrid, 
   FiMusic, 
-  FiSettings,
   FiBarChart2,
   FiPlusCircle,
   FiImage,
