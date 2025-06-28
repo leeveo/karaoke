@@ -130,7 +130,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
       formData.append('file', file);
 
       // Ajoute l'id du projet dans le nom du fichier (si dispo)
-      // Correction : éviter 'any', on utilise une assertion d'objet partiel typé
+      // Utilise l'id du projet ou un timestamp si pas encore créé
       const projectId =
         (formValues as Partial<{ id?: string; projectId?: string }>).id ||
         (formValues as Partial<{ id?: string; projectId?: string }>).projectId ||
@@ -185,7 +185,10 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
 
       // Ajoute l'id du projet dans le nom du fichier (si dispo)
       // Utilise l'id du projet ou un timestamp si pas encore créé
-      const projectId = formValues.id || formValues.projectId || 'nouveau';
+      const projectId =
+        (formValues as Partial<{ id?: string; projectId?: string }>).id ||
+        (formValues as Partial<{ id?: string; projectId?: string }>).projectId ||
+        'nouveau';
       formData.append('projectId', projectId);
 
       // Utilise la même API d'upload S3
