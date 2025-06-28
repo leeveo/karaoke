@@ -38,7 +38,7 @@ export default function AdminSidebar({ activeTab, isOpen, onClose, setActiveTab 
           />
         </div>
         <p className="text-sm text-purple-600 font-bold italic text-center">
-          "Automatisez la magie.<br/> Laissez Waibooth gérer le show."
+          Automatisez la magie.<br/> Laissez Waibooth gérer le show.
         </p>
       </div>
       <nav className="mt-6 flex flex-col gap-2 text-sm">
