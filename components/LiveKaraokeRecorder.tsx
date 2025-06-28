@@ -79,6 +79,9 @@ function LiveKaraokeRecorderInner({
     async function loadEventAndLogo() {
       try {
         console.log("Loading event data for logo:", eventId);
+        if (!eventId) {
+          throw new Error("eventId is required to fetch event data");
+        }
         const eventData = await fetchEventById(eventId);
         
         // Vérifier si un logo existe
