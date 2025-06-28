@@ -6,7 +6,6 @@ import { getSongsByCategory, Song } from '@/services/s3Service';
 import { motion } from 'framer-motion';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader'; // Importer le loader de transition
 
 // Fonction de mappage entre les catégories de l'URL et les dossiers S3
@@ -26,7 +25,6 @@ export default function EventCategoryPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [bgLoaded, setBgLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false); // Nouvel état pour la navigation
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
 

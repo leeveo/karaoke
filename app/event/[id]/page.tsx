@@ -18,26 +18,6 @@ export default function EventPage() {
   const [error, setError] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
 
-  // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
-  function adjustColorLightness(color: string, percent: number): string {
-    try {
-      // Convert hex to RGB
-      let r = parseInt(color.substring(1,3), 16);
-      let g = parseInt(color.substring(3,5), 16);
-      let b = parseInt(color.substring(5,7), 16);
-
-      // Adjust lightness
-      r = Math.min(255, Math.max(0, r + (r * percent / 100)));
-      g = Math.min(255, Math.max(0, g + (g * percent / 100)));
-      b = Math.min(255, Math.max(0, b + (b * percent / 100)));
-
-      // Convert back to hex
-      return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
-    } catch {
-      return color; // Return original color if any error occurs
-    }
-  }
-
   useEffect(() => {
     async function loadEvent() {
       if (id) {
@@ -155,8 +135,8 @@ export default function EventPage() {
           {/* Display the logo if available */}
           {event.customization?.logo && (
             <div className="w-64 h-64 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
-              {/* Correction stricte : si c'est déjà une URL, on l'utilise telle quelle, sinon on construit l'URL S3 */}
-              <img
+              {/* Use Next.js Image for optimization */}
+              <Image
                 src={
                   event.customization.logo.startsWith('http')
                     ? event.customization.logo

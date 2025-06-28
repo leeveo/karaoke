@@ -6,7 +6,6 @@ import { useEffect, useState, useRef } from 'react';
 import { getSongUrl } from '@/services/s3Service';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
 
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
@@ -18,7 +17,6 @@ export default function EventKaraokePage() {
   const preloadRef = useRef<HTMLVideoElement>(null);
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
-  const [bgLoaded, setBgLoaded] = useState(false);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   
   // Extraire le nom de la chanson à partir de l'ID
