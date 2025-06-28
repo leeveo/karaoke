@@ -60,6 +60,7 @@ export default function ReviewPage() {
       const blob = await response.blob();
 
       // Correction : convertir le Blob en File pour uploadToS3
+      const filename = `karaoke-videos/review_${sessionId}-${Date.now()}.webm`;
       const file = new File([blob], filename, { type: blob.type });
 
       console.log("Uploading video with embedded logo to S3...");
