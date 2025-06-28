@@ -28,7 +28,7 @@ export default function CreateEventPage() {
         } else {
           // En production, vérifier simplement l'utilisateur actuel
           const currentUser = await getCurrentUser();
-          setUser(currentUser);
+          setUser(currentUser ?? {}); // Fix: always set an object
           
           if (!currentUser) {
             setError('Vous devez être connecté pour créer un événement.');
