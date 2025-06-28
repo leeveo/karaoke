@@ -130,8 +130,11 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
       formData.append('file', file);
 
       // Ajoute l'id du projet dans le nom du fichier (si dispo)
-      // Correction : EventInput n'a pas de propriété 'id', donc on ne l'utilise pas
-      const projectId = (formValues as any).id || (formValues as any).projectId || 'nouveau';
+      // Correction : éviter 'any', on utilise une assertion d'objet partiel typé
+      const projectId =
+        (formValues as Partial<{ id?: string; projectId?: string }>).id ||
+        (formValues as Partial<{ id?: string; projectId?: string }>).projectId ||
+        'nouveau';
       formData.append('projectId', projectId);
 
       // Utilise la route App Router
