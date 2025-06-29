@@ -27,42 +27,48 @@ function generateColor(str: string) {
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userIdFromCookie, setUserIdFromCookie] = useState<string | null>(null);
+  const [emailFromDb, setEmailFromDb] = useState<string | null>(null);
   const router = useRouter();
 
-  // Lire et décoder le cookie shared_auth_token pour obtenir le userId
+  // Récupère l'id utilisateur depuis le cookie partagé
   useEffect(() => {
-    const token = getCookieValue('shared_auth_token');
-    if (token) {
-      try {
-        const decoded = atob(decodeURIComponent(token));
-        const payload = JSON.parse(decoded);
-        if (payload.userId) {
-          setUserId(payload.userId);
+    try {
+      const cookies = document.cookie.split(';').map(c => c.trim());
+      const tokenCookie =
+        cookies.find(c => c.startsWith('shared_auth_token=')) ||
+        cookies.find(c => c.startsWith('admin_session='));
+      if (tokenCookie) {
+        const token = tokenCookie.split('=')[1];
+        const decodedToken = decodeURIComponent(token);
+        const userData = JSON.parse(atob(decodedToken));
+        if (userData.userId) {
+          setUserIdFromCookie(userData.userId);
         }
-      } catch {
-        setUserId(null);
       }
+    } catch {
+      setUserIdFromCookie(null);
     }
   }, []);
 
-  // Aller chercher l'email dans admin_users à partir du userId
+  // Va chercher l'email dans admin_users à partir de l'id utilisateur du cookie
   useEffect(() => {
     const fetchEmail = async () => {
-      if (userId) {
+      if (userIdFromCookie) {
         const { data } = await supabase
           .from('admin_users')
           .select('email')
-          .eq('id', userId)
+          .eq('id', userIdFromCookie)
           .single();
         if (data && data.email) {
-          setUserEmail(data.email);
+          setEmailFromDb(data.email);
+        } else {
+          setEmailFromDb(null);
         }
       }
     };
     fetchEmail();
-  }, [userId]);
+  }, [userIdFromCookie]);
 
   // Fermer le menu au clic extérieur
   useEffect(() => {
@@ -83,7 +89,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
     router.push('/auth/login');
   };
 
-  const email = userEmail || '';
+  const email = emailFromDb || '';
   const userInitial = email ? email.charAt(0).toUpperCase() : 'U';
   const avatarColor = email ? generateColor(email) : 'hsl(250, 70%, 45%)';
 
@@ -126,9 +132,9 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
               <div className="p-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500">Connecté en tant que:</p>
                 <p className="font-medium text-gray-800 truncate">{email}</p>
-                {userId && (
+                {userIdFromCookie && (
                   <p className="text-xs text-gray-400 mt-1">
-                    ID utilisateur: <span className="font-mono">{userId}</span>
+                    ID utilisateur: <span className="font-mono">{userIdFromCookie}</span>
                   </p>
                 )}
               </div>
