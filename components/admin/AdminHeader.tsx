@@ -48,7 +48,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     const fetchUser = async () => {
       if (userId) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('admin_users')
           .select('email')
           .eq('id', userId)
