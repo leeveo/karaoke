@@ -19,7 +19,16 @@ const mapCategoryToS3Folder = (category: string): string => {
 };
 
 export default function EventCategoryPage() {
-  const { id, category } = useParams();
+  // Extraction sécurisée des paramètres id et category
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  let category = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    const rawCategory = params.category;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+    category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory || '';
+  }
   const router = useRouter();
   const [songs, setSongs] = useState<Song[]>([]);
   const [event, setEvent] = useState<Event | null>(null);
