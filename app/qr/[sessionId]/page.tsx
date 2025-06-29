@@ -7,8 +7,11 @@ import { getSongUrl } from '@/services/s3Service';
 
 export default function QRPage() {
   const searchParams = useSearchParams();
-  const { sessionId } = useParams();
-  const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
+  let pageUrlInit: string | null = null;
+  if (searchParams && typeof searchParams.get === 'function') {
+    pageUrlInit = searchParams.get('pageUrl');
+  }
+  const [pageUrl, setPageUrl] = useState<string | null>(pageUrlInit);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const router = useRouter();
@@ -92,6 +95,14 @@ export default function QRPage() {
     
     getQrUrl();
   }, [pageUrl, router]);
+
+  // Extraction sécurisée du paramètre sessionId
+  const params = useParams() as Record<string, string | string[]>;
+  let sessionId = '';
+  if (params && typeof params === 'object') {
+    const rawSessionId = params.sessionId;
+    sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '';
+  }
 
   // États
   // Fix: Remove unused isSharing state

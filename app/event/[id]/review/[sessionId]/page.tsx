@@ -19,7 +19,16 @@ export default function EventReviewPage() {
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const { id, sessionId } = useParams();
+  // Extraction sécurisée des paramètres id et sessionId
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  let sessionId = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    const rawSessionId = params.sessionId;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+    sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '';
+  }
   const router = useRouter();
 
   // Charger l'événement et ses personnalisations

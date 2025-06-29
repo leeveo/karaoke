@@ -49,7 +49,13 @@ function LiveKaraokeRecorderInner({
   
   // Navigation
   const router = useRouter();
-  const { songId } = useParams();
+  // Extraction sécurisée du paramètre songId
+  const params = useParams() as Record<string, string | string[]>;
+  let songId = '';
+  if (params && typeof params === 'object') {
+    const rawSongId = params.songId;
+    songId = Array.isArray(rawSongId) ? rawSongId[0] : rawSongId || '';
+  }
   
   // États
   const [recordingStarted, setRecordingStarted] = useState(false);

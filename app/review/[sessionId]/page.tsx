@@ -11,7 +11,13 @@ export default function ReviewPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const { sessionId } = useParams();
+  // Extraction sécurisée du paramètre sessionId
+  const params = useParams() as Record<string, string | string[]>;
+  let sessionId = '';
+  if (params && typeof params === 'object') {
+    const rawSessionId = params.sessionId;
+    sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '';
+  }
   const router = useRouter();
 
   // Load logo for display

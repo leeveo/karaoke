@@ -6,7 +6,13 @@ import { useEffect, useState, useRef } from 'react';
 import { getSongUrl } from '../../../services/s3Service';
 
 export default function KaraokePage() {
-  const { songId } = useParams();
+  // Extraction sécurisée du paramètre songId
+  const params = useParams() as Record<string, string | string[]>;
+  let songId = '';
+  if (params && typeof params === 'object') {
+    const rawSongId = params.songId;
+    songId = Array.isArray(rawSongId) ? rawSongId[0] : rawSongId || '';
+  }
   const decodedSongId = decodeURIComponent(songId as string);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
