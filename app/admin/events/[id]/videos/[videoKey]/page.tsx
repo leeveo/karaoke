@@ -9,7 +9,9 @@ import Link from 'next/link';
 import { Event } from '@/types/event'; // Make sure this import is available
 
 export default function VideoPlayerPage() {
-  const { id, videoKey } = useParams();
+  const params = useParams();
+  const id = (params && typeof params === 'object' && 'id' in params) ? (params as Record<string, string>).id : '';
+  const videoKey = (params && typeof params === 'object' && 'videoKey' in params) ? (params as Record<string, string>).videoKey : '';
   const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null); // Fixed: Specify proper type instead of any
@@ -22,13 +24,13 @@ export default function VideoPlayerPage() {
         setLoading(true);
         
         // Charger les informations de l'événement
-        if (typeof id === 'string') {
+        if (typeof id === 'string' && id) {
           const eventData = await fetchEventById(id);
           setEvent(eventData);
         }
         
         // Générer une URL signée pour la vidéo
-        if (typeof videoKey === 'string') {
+        if (typeof videoKey === 'string' && videoKey) {
           // Décodage de la clé vidéo et reconstruction du chemin complet
           const decodedKey = decodeURIComponent(videoKey);
           const videoPath = `karaoke-videos/event_${id}/${decodedKey}`;
