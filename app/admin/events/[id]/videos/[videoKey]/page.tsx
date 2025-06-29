@@ -153,3 +153,16 @@ export default function VideoPlayerPage() {
     </div>
   );
 }
+
+// Remplacez dans votre CategoryPage (ou toute page dynamique similaire) :
+export default function CategoryPage() {
+  // Extraction sécurisée du paramètre category
+  const params = useParams() as Record<string, string | string[]>;
+  let category = '';
+  if (params && typeof params === 'object') {
+    const rawCategory = params.category;
+    category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory || '';
+  }
+  const router = useRouter();
+  // ...existing code...
+}
