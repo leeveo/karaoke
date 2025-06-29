@@ -7,13 +7,6 @@ interface AdminHeaderProps {
   onMenuClick: () => void;
 }
 
-// Fonction utilitaire pour lire un cookie par son nom
-function getCookieValue(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? match[2] : null;
-}
-
 // Génère une couleur à partir d'une chaîne
 function generateColor(str: string) {
   let hash = 0;
