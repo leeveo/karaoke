@@ -11,7 +11,7 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const params = useParams();
-  const id = params.id as string;
+  const id = params?.id as string;
 
   useEffect(() => {
     async function loadEvent() {
