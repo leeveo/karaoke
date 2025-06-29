@@ -65,7 +65,7 @@ export async function fetchEventById(id: string): Promise<Event> {
 }
 
 // Créer un nouvel événement
-export async function createEvent(eventData: any) {
+export async function createEvent(eventData: EventInput & { user_id: string }) {
   // Ajoute ce log pour vérifier ce qui est envoyé à Supabase
   console.log('Creating event with data:', eventData);
 
