@@ -74,18 +74,25 @@ export async function createEvent(eventData: EventInput & { user_id: string }) {
     throw new Error('user_id manquant ou null lors de la création de l\'événement');
   }
 
-  // Envoie tous les champs nécessaires à la table events
-  const { name, date, description, location, user_id, is_active } = eventData;
+  // Utilise les champs optionnels avec fallback
+  const { name, date, user_id } = eventData;
+  // @ts-expect-error: description et location peuvent ne pas exister sur EventInput
+  const description = (eventData as any).description || null;
+  // @ts-expect-error: description et location peuvent ne pas exister sur EventInput
+  const location = (eventData as any).location || null;
+  // @ts-expect-error: is_active peut ne pas exister sur EventInput
+  const is_active = (eventData as any).is_active !== undefined ? (eventData as any).is_active : true;
+
   const { data, error } = await supabase
     .from('events')
     .insert([
       {
         name,
         date,
-        description: description || null,
-        location: location || null,
+        description,
+        location,
         user_id,
-        is_active: is_active !== undefined ? is_active : true,
+        is_active,
       }
     ])
     .single();
