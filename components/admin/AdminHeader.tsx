@@ -8,26 +8,6 @@ interface AdminHeaderProps {
   onMenuClick: () => void;
 }
 
-// Utilitaire pour lire le cookie côté client
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()!.split(';').shift() || null;
-  return null;
-}
-
-// Décoder le token base64
-function decodeSharedAuthToken(token: string | null) {
-  if (!token) return null;
-  try {
-    const decoded = atob(token);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
-
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [userIdFromCookie, setUserIdFromCookie] = useState<string | null>(null);
@@ -53,7 +33,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
           if (userData.name) setUserName(userData.name);
         }
       }
-    } catch (e) {
+    } catch {
       setUserIdFromCookie(null);
     }
   }, []);
@@ -62,7 +42,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     const fetchUserInfo = async () => {
       if (userIdFromCookie) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('admin_users')
           .select('email, name')
           .eq('id', userIdFromCookie)
