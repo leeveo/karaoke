@@ -65,7 +65,7 @@ export async function fetchEventById(id: string): Promise<Event> {
 }
 
 // Créer un nouvel événement
-export async function createEvent(eventData: EventInput & { user_id: string }) {
+export async function createEvent(eventData: EventInput & { user_id: string; description?: string; location?: string; is_active?: boolean }) {
   // Ajoute ce log pour vérifier ce qui est envoyé à Supabase
   console.log('Creating event with data:', eventData);
 
@@ -75,13 +75,7 @@ export async function createEvent(eventData: EventInput & { user_id: string }) {
   }
 
   // Utilise les champs optionnels avec fallback
-  const { name, date, user_id } = eventData;
-  // @ts-expect-error: description et location peuvent ne pas exister sur EventInput
-  const description = (eventData as any).description || null;
-  // @ts-expect-error: description et location peuvent ne pas exister sur EventInput
-  const location = (eventData as any).location || null;
-  // @ts-expect-error: is_active peut ne pas exister sur EventInput
-  const is_active = (eventData as any).is_active !== undefined ? (eventData as any).is_active : true;
+  const { name, date, user_id, description = null, location = null, is_active = true } = eventData;
 
   const { data, error } = await supabase
     .from('events')
