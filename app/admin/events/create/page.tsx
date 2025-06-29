@@ -5,56 +5,61 @@ import { useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
 import { createEvent } from '@/lib/supabase/events';
 import { EventInput } from '@/types/event';
-import { ensureDevelopmentUser, getCurrentUser } from '@/lib/supabase/auth';
+import { supabase } from '@/lib/supabase/client';
+
+function getUserIdFromCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const cookies = document.cookie.split(';').map(c => c.trim());
+    const tokenCookie =
+      cookies.find(c => c.startsWith('shared_auth_token=')) ||
+      cookies.find(c => c.startsWith('admin_session='));
+    if (tokenCookie) {
+      const token = tokenCookie.split('=')[1];
+      const decodedToken = decodeURIComponent(token);
+      const userData = JSON.parse(atob(decodedToken));
+      if (userData.userId) {
+        return userData.userId;
+      }
+    }
+  } catch (err) {
+    console.error('[CreateEventPage] Error decoding userId from cookie:', err);
+  }
+  return null;
+}
 
 export default function CreateEventPage() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [user, setUser] = useState<{email?: string; id?: string}>({});
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Vérifier l'authentification
+  // Récupérer l'id utilisateur connecté
   useEffect(() => {
-    async function checkAuth() {
-      try {
-        // Pour le développement, passer l'email et le mot de passe souhaités
-        const devUser = await ensureDevelopmentUser('marcmenu707@gmail.com', 'ViE51800!');
-        if (devUser) {
-          setUser(devUser);
-          console.log('Utilisateur de développement prêt:', devUser.email);
-        } else {
-          // En production, vérifier simplement l'utilisateur actuel
-          const currentUser = await getCurrentUser();
-          setUser(currentUser ?? {}); // Fix: always set an object
-          
-          if (!currentUser) {
-            setError('Vous devez être connecté pour créer un événement.');
-          }
-        }
-      } catch (err) {
-        console.error('Erreur lors de la vérification de l\'authentification:', err);
-        setError('Erreur d\'authentification');
-      } finally {
-        setIsReady(true);
-      }
+    const id = getUserIdFromCookie();
+    if (!id) {
+      setError('Vous devez être connecté pour créer un événement.');
     }
-    
-    checkAuth();
+    setUserId(id);
+    setIsReady(true);
   }, []);
 
-  // Replace 'any' with a more specific type (EventInput)
   const handleSubmit = async (eventData: EventInput) => {
+    if (!userId) {
+      setError('Impossible de créer l\'événement : utilisateur non authentifié.');
+      return;
+    }
     try {
       setIsSubmitting(true);
-      // Log pour debug
-      console.log("EventData envoyé à createEvent:", eventData);
-      await createEvent(eventData);
+      // Ajoute le user_id à l'event
+      const eventWithUser = { ...eventData, user_id: userId };
+      console.log('[CreateEventPage] Event envoyé à createEvent:', eventWithUser);
+      await createEvent(eventWithUser);
       router.push('/admin/events');
     } catch (error) {
       console.error("Error creating event:", error);
+      setError("Création impossible: " + (error as Error).message);
       setIsSubmitting(false);
     }
   };
@@ -77,7 +82,6 @@ export default function CreateEventPage() {
         </div>
       )}
       
-      {/* Remove the isSubmitting prop that's causing the type error */}
       <EventForm onSubmit={handleSubmit} />
     </div>
   );
