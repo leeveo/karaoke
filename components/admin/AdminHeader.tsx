@@ -8,53 +8,51 @@ interface AdminHeaderProps {
   onMenuClick: () => void;
 }
 
+// Fonction utilitaire pour lire un cookie par son nom
+function getCookieValue(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [userIdFromCookie, setUserIdFromCookie] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
   const router = useRouter();
 
-  // Récupère l'id utilisateur depuis le cookie partagé
+  // Lire et décoder le cookie shared_auth_token pour obtenir le userId
   useEffect(() => {
-    try {
-      const cookies = document.cookie.split(';').map(c => c.trim());
-      const tokenCookie =
-        cookies.find(c => c.startsWith('shared_auth_token=')) ||
-        cookies.find(c => c.startsWith('admin_session='));
-      if (tokenCookie) {
-        const token = tokenCookie.split('=')[1];
-        const decodedToken = decodeURIComponent(token);
-        const userData = JSON.parse(atob(decodedToken));
-        if (userData.userId) {
-          setUserIdFromCookie(userData.userId);
-          // Optionnel: si le token contient déjà l'email ou le nom
-          if (userData.email) setUserEmail(userData.email);
-          if (userData.name) setUserName(userData.name);
+    const token = getCookieValue('shared_auth_token');
+    if (token) {
+      try {
+        const decoded = atob(decodeURIComponent(token));
+        const payload = JSON.parse(decoded);
+        if (payload.userId) {
+          setUserId(payload.userId);
         }
+      } catch {
+        setUserId(null);
       }
-    } catch {
-      setUserIdFromCookie(null);
     }
   }, []);
 
-  // Va chercher l'email et le nom dans admin_users à partir de l'id utilisateur du cookie
+  // Aller chercher l'email dans admin_users à partir du userId
   useEffect(() => {
-    const fetchUserInfo = async () => {
-      if (userIdFromCookie) {
+    const fetchEmail = async () => {
+      if (userId) {
         const { data } = await supabase
           .from('admin_users')
-          .select('email, name')
-          .eq('id', userIdFromCookie)
+          .select('email')
+          .eq('id', userId)
           .single();
-        if (data) {
+        if (data && data.email) {
           setUserEmail(data.email);
-          setUserName(data.name);
         }
       }
     };
-    fetchUserInfo();
-  }, [userIdFromCookie]);
+    fetchEmail();
+  }, [userId]);
 
   const handleLogout = async () => {
     await signOut();
@@ -93,7 +91,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
               <FiUser className="h-4 w-4" />
             </div>
             <span className="hidden md:block text-sm font-medium text-gray-700">
-              {userName || userEmail || userIdFromCookie || 'Admin'}
+              {userEmail || userId || 'Admin'}
             </span>
           </button>
           
