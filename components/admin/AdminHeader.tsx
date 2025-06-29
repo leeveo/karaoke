@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiMenu, FiBell, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
 import { signOut } from '@/lib/supabase/auth';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // Assurez-vous que ce chemin est correct
+import { supabase } from '@/lib/supabase/client';
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
