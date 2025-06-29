@@ -10,13 +10,19 @@ function getUserIdFromCookie(): string | null {
   if (typeof document === 'undefined') return null;
   try {
     const cookies = document.cookie.split(';').map(c => c.trim());
+    // Log cookies pour debug
+    console.log('[CreateEventPage] Cookies:', cookies);
     const tokenCookie =
       cookies.find(c => c.startsWith('shared_auth_token=')) ||
       cookies.find(c => c.startsWith('admin_session='));
+    console.log('[CreateEventPage] Token cookie:', tokenCookie);
     if (tokenCookie) {
       const token = tokenCookie.split('=')[1];
+      console.log('[CreateEventPage] Encoded token:', token);
       const decodedToken = decodeURIComponent(token);
+      console.log('[CreateEventPage] Decoded token:', decodedToken);
       const userData = JSON.parse(atob(decodedToken));
+      console.log('[CreateEventPage] userData:', userData);
       if (userData.userId) {
         return userData.userId;
       }
@@ -44,6 +50,8 @@ export default function CreateEventPage() {
   }, []);
 
   const handleSubmit = async (eventData: EventInput) => {
+    // Ajoute ce log pour vérifier la présence du userId
+    console.log('[CreateEventPage] userId utilisé pour création:', userId);
     if (!userId) {
       setError('Impossible de créer l\'événement : utilisateur non authentifié.');
       return;
