@@ -66,6 +66,7 @@ export default function CreateEventPage() {
     try {
       const eventWithUser = { ...eventData, user_id: userId };
       console.log('[CreateEventPage] Event envoyé à createEvent:', eventWithUser);
+      // Assure-toi d'appeler createEvent(eventWithUser) et PAS createEvent(eventData)
       await createEvent(eventWithUser);
       router.push('/admin/events');
     } catch (error) {

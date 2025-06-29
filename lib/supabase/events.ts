@@ -66,15 +66,13 @@ export async function fetchEventById(id: string): Promise<Event> {
 
 // Créer un nouvel événement
 export async function createEvent(eventData: EventInput & { user_id: string; description?: string; location?: string; is_active?: boolean }) {
-  // Ajoute ce log pour vérifier ce qui est envoyé à Supabase
-  console.log('Creating event with data:', eventData);
+  // Log pour vérifier ce qui est reçu
+  console.log('[createEvent] eventData reçu:', eventData);
 
-  // Vérifie que user_id est bien présent et non null
   if (!eventData.user_id) {
     throw new Error('user_id manquant ou null lors de la création de l\'événement');
   }
 
-  // Utilise les champs optionnels avec fallback
   const { name, date, user_id, description = null, location = null, is_active = true } = eventData;
 
   const { data, error } = await supabase
