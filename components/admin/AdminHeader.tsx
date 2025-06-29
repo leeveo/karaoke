@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiMenu, FiBell, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
 import { signOut } from '@/lib/supabase/auth';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // Assurez-vous que ce chemin est correct
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -29,19 +30,51 @@ function decodeSharedAuthToken(token: string | null) {
 
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
+  const [userIdFromCookie, setUserIdFromCookie] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const router = useRouter();
 
+  // Récupère l'id utilisateur depuis le cookie partagé
   useEffect(() => {
-    const token = getCookie('shared_auth_token');
-    const data = decodeSharedAuthToken(token);
-    if (data) {
-      setUserInfo({
-        email: data.email,
-        name: data.name,
-      });
+    try {
+      const cookies = document.cookie.split(';').map(c => c.trim());
+      const tokenCookie =
+        cookies.find(c => c.startsWith('shared_auth_token=')) ||
+        cookies.find(c => c.startsWith('admin_session='));
+      if (tokenCookie) {
+        const token = tokenCookie.split('=')[1];
+        const decodedToken = decodeURIComponent(token);
+        const userData = JSON.parse(atob(decodedToken));
+        if (userData.userId) {
+          setUserIdFromCookie(userData.userId);
+          // Optionnel: si le token contient déjà l'email ou le nom
+          if (userData.email) setUserEmail(userData.email);
+          if (userData.name) setUserName(userData.name);
+        }
+      }
+    } catch (e) {
+      setUserIdFromCookie(null);
     }
   }, []);
+
+  // Va chercher l'email et le nom dans admin_users à partir de l'id utilisateur du cookie
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (userIdFromCookie) {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('email, name')
+          .eq('id', userIdFromCookie)
+          .single();
+        if (data) {
+          setUserEmail(data.email);
+          setUserName(data.name);
+        }
+      }
+    };
+    fetchUserInfo();
+  }, [userIdFromCookie]);
 
   const handleLogout = async () => {
     await signOut();
@@ -80,7 +113,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
               <FiUser className="h-4 w-4" />
             </div>
             <span className="hidden md:block text-sm font-medium text-gray-700">
-              {userInfo?.name || userInfo?.email || 'Admin'}
+              {userName || userEmail || userIdFromCookie || 'Admin'}
             </span>
           </button>
           
