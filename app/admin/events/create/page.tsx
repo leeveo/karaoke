@@ -7,10 +7,12 @@ import { createEvent } from '@/lib/supabase/events';
 import { EventInput } from '@/types/event';
 
 function getUserIdFromCookie(): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined') {
+    console.log('[CreateEventPage] document is undefined (SSR)');
+    return null;
+  }
   try {
     const cookies = document.cookie.split(';').map(c => c.trim());
-    // Log cookies pour debug
     console.log('[CreateEventPage] Cookies:', cookies);
     const tokenCookie =
       cookies.find(c => c.startsWith('shared_auth_token=')) ||
@@ -24,8 +26,13 @@ function getUserIdFromCookie(): string | null {
       const userData = JSON.parse(atob(decodedToken));
       console.log('[CreateEventPage] userData:', userData);
       if (userData.userId) {
+        console.log('[CreateEventPage] userId found:', userData.userId);
         return userData.userId;
+      } else {
+        console.log('[CreateEventPage] userId not found in userData');
       }
+    } else {
+      console.log('[CreateEventPage] No token cookie found');
     }
   } catch (err) {
     console.error('[CreateEventPage] Error decoding userId from cookie:', err);
@@ -42,6 +49,7 @@ export default function CreateEventPage() {
   // Récupérer l'id utilisateur connecté
   useEffect(() => {
     const id = getUserIdFromCookie();
+    console.log('[CreateEventPage] userId set in state:', id);
     if (!id) {
       setError('Vous devez être connecté pour créer un événement.');
     }
@@ -50,14 +58,12 @@ export default function CreateEventPage() {
   }, []);
 
   const handleSubmit = async (eventData: EventInput) => {
-    // Ajoute ce log pour vérifier la présence du userId
     console.log('[CreateEventPage] userId utilisé pour création:', userId);
     if (!userId) {
       setError('Impossible de créer l\'événement : utilisateur non authentifié.');
       return;
     }
     try {
-      // Ajoute le user_id à l'event
       const eventWithUser = { ...eventData, user_id: userId };
       console.log('[CreateEventPage] Event envoyé à createEvent:', eventWithUser);
       await createEvent(eventWithUser);
