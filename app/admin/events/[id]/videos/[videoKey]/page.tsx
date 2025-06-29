@@ -9,9 +9,14 @@ import Link from 'next/link';
 import { Event } from '@/types/event'; // Make sure this import is available
 
 export default function VideoPlayerPage() {
+  // Correction : extraction sécurisée des paramètres id et videoKey
   const params = useParams();
-  const id = (params && typeof params === 'object' && 'id' in params) ? (params as Record<string, string>).id : '';
-  const videoKey = (params && typeof params === 'object' && 'videoKey' in params) ? (params as Record<string, string>).videoKey : '';
+  let id = '';
+  let videoKey = '';
+  if (params && typeof params === 'object') {
+    id = typeof (params as any).id === 'string' ? (params as any).id : Array.isArray((params as any).id) ? (params as any).id[0] : '';
+    videoKey = typeof (params as any).videoKey === 'string' ? (params as any).videoKey : Array.isArray((params as any).videoKey) ? (params as any).videoKey[0] : '';
+  }
   const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null); // Fixed: Specify proper type instead of any
