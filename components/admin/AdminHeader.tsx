@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FiMenu } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
@@ -83,8 +83,8 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   };
 
   const email = emailFromDb || '';
-  const userInitial = email ? email.charAt(0).toUpperCase() : 'U';
-  const avatarColor = email ? generateColor(email) : 'hsl(250, 70%, 45%)';
+  const userInitial = email ? email.charAt(0).toUpperCase() : (userIdFromCookie ? userIdFromCookie.charAt(0).toUpperCase() : 'U');
+  const avatarColor = email ? generateColor(email) : (userIdFromCookie ? generateColor(userIdFromCookie) : 'hsl(250, 70%, 45%)');
 
   return (
     <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 lg:px-6">
@@ -114,7 +114,9 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             </div>
             <div className="hidden md:flex flex-col items-start">
               <span className="text-sm font-medium text-gray-700">Mon compte</span>
-              <span className="text-xs text-gray-500 truncate max-w-[120px]">{email}</span>
+              <span className="text-xs text-gray-500 truncate max-w-[120px]">
+                {email || userIdFromCookie || ''}
+              </span>
             </div>
             <svg className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -124,7 +126,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 transition-all duration-200 transform origin-top-right">
               <div className="p-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500">Connecté en tant que:</p>
-                <p className="font-medium text-gray-800 truncate">{email}</p>
+                <p className="font-medium text-gray-800 truncate">{email || userIdFromCookie || ''}</p>
                 {userIdFromCookie && (
                   <p className="text-xs text-gray-400 mt-1">
                     ID utilisateur: <span className="font-mono">{userIdFromCookie}</span>
