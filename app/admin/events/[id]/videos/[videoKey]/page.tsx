@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Event } from '@/types/event'; // Make sure this import is available
 
 export default function VideoPlayerPage() {
-  // Correction : extraction sécurisée des paramètres id et videoKey sans utiliser 'any'
+  // Correction : extraction sécurisée des paramètres id et videoKey sans destructuring direct
   const params = useParams() as Record<string, string | string[]>;
   let id = '';
   let videoKey = '';
