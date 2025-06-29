@@ -28,18 +28,24 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     try {
       const cookies = document.cookie.split(';').map(c => c.trim());
+      console.log('[AdminHeader] Cookies:', cookies);
       const tokenCookie =
         cookies.find(c => c.startsWith('shared_auth_token=')) ||
         cookies.find(c => c.startsWith('admin_session='));
+      console.log('[AdminHeader] Token cookie:', tokenCookie);
       if (tokenCookie) {
         const token = tokenCookie.split('=')[1];
+        console.log('[AdminHeader] Encoded token:', token);
         const decodedToken = decodeURIComponent(token);
+        console.log('[AdminHeader] Decoded token:', decodedToken);
         const userData = JSON.parse(atob(decodedToken));
+        console.log('[AdminHeader] userData:', userData);
         if (userData.userId) {
           setUserId(userData.userId);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[AdminHeader] Error decoding cookie:', err);
       setUserId(null);
     }
   }, []);
@@ -48,11 +54,13 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     const fetchUser = async () => {
       if (userId) {
-        const { data } = await supabase
+        console.log('[AdminHeader] Fetching email for userId:', userId);
+        const { data, error } = await supabase
           .from('admin_users')
           .select('email')
           .eq('id', userId)
           .single();
+        console.log('[AdminHeader] Supabase response:', { data, error });
         if (data && data.email) {
           setUserEmail(data.email);
         } else {
