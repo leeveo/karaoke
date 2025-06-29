@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiMenu, FiBell, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
 import { signOut } from '@/lib/supabase/auth';
 import { useRouter } from 'next/navigation';
@@ -7,9 +7,41 @@ interface AdminHeaderProps {
   onMenuClick: () => void;
 }
 
+// Utilitaire pour lire le cookie côté client
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()!.split(';').shift() || null;
+  return null;
+}
+
+// Décoder le token base64
+function decodeSharedAuthToken(token: string | null) {
+  if (!token) return null;
+  try {
+    const decoded = atob(token);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const token = getCookie('shared_auth_token');
+    const data = decodeSharedAuthToken(token);
+    if (data) {
+      setUserInfo({
+        email: data.email,
+        name: data.name,
+      });
+    }
+  }, []);
 
   const handleLogout = async () => {
     await signOut();
@@ -47,7 +79,9 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
               <FiUser className="h-4 w-4" />
             </div>
-            <span className="hidden md:block text-sm font-medium text-gray-700">Admin</span>
+            <span className="hidden md:block text-sm font-medium text-gray-700">
+              {userInfo?.name || userInfo?.email || 'Admin'}
+            </span>
           </button>
           
           {isProfileMenuOpen && (
