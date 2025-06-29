@@ -19,7 +19,11 @@ export default function EventQRPage() {
     id = Array.isArray(rawId) ? rawId[0] : rawId || '';
     sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '';
   }
-  const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
+  let pageUrlInit: string | null = null;
+  if (searchParams && typeof searchParams.get === 'function') {
+    pageUrlInit = searchParams.get('pageUrl');
+  }
+  const [pageUrl, setPageUrl] = useState<string | null>(pageUrlInit);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
