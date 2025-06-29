@@ -65,79 +65,36 @@ export async function fetchEventById(id: string): Promise<Event> {
 }
 
 // Créer un nouvel événement
-export async function createEvent(eventData: EventInput): Promise<string | null> {
-  try {
-    console.log("Creating event with data:", {
-      name: eventData.name,
-      date: eventData.date,
-      // Log only basic fields to avoid sensitive data
-    });
-    
-    // Check current auth session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    
-    if (authError) {
-      console.error("Authentication error:", authError.message);
-      throw new Error("Erreur d'authentification. Veuillez vous reconnecter.");
-    }
-    
-    // For development, use a simplified approach with minimal data
-    // that avoids RLS and schema issues
-    const basicEventData = {
-      name: eventData.name || 'Événement sans nom',
-      date: eventData.date || new Date().toISOString(),
-      is_active: true,
-      // Always include user_id from the session if available
-      ...(session?.user?.id ? { user_id: session.user.id } : {})
-    };
+export async function createEvent(eventData: any) {
+  // Ajoute ce log pour vérifier ce qui est envoyé à Supabase
+  console.log('Creating event with data:', eventData);
 
-    // Insert with explicit RLS bypass for development 
-    // (in production, the user needs appropriate permissions)
-    const { data: eventResult, error: eventError } = await supabase
-      .from('events')
-      .insert(basicEventData)
-      .select('id')
-      .single();
-
-    if (eventError) {
-      console.error("Database error creating event:", eventError.message);
-      
-      // If we hit RLS issues, try one more approach - use a service role if available
-      if (eventError.message.includes('row-level security')) {
-        console.log("RLS error detected, trying workaround...");
-        
-        // Development workaround: Insert directly with minimal data
-        // and without customization to avoid schema issues
-        const { data: directResult, error: directError } = await supabase
-          .from('events')
-          .insert({
-            name: eventData.name,
-            date: eventData.date,
-          })
-          .select('id');
-        
-        if (directError || !directResult?.length) {
-          console.error("Final attempt failed:", directError?.message || "No result returned");
-          throw new Error(`Création impossible: ${directError?.message || "Erreur d'accès à la base de données"}`);
-        }
-        
-        console.log("Created event with ID:", directResult[0].id);
-        return directResult[0].id;
-      }
-      
-      throw new Error(`Erreur lors de la création: ${eventError.message}`);
-    }
-    
-    if (!eventResult?.id) {
-      throw new Error("Aucun ID d'événement retourné");
-    }
-
-    console.log("Successfully created event with ID:", eventResult.id);
-    return eventResult.id;
-  } catch (error) {
-    console.error('Error creating event:', error instanceof Error ? error.message : error);
-    throw error; // Rethrow to let the UI handle it
+  // Vérifie que user_id est bien présent et non null
+  if (!eventData.user_id) {
+    throw new Error('user_id manquant ou null lors de la création de l\'événement');
   }
+
+  // Envoie tous les champs nécessaires à la table events
+  const { name, date, description, location, user_id, is_active } = eventData;
+  const { data, error } = await supabase
+    .from('events')
+    .insert([
+      {
+        name,
+        date,
+        description: description || null,
+        location: location || null,
+        user_id,
+        is_active: is_active !== undefined ? is_active : true,
+      }
+    ])
+    .single();
+
+  if (error) {
+    console.error('Database error creating event:', error.message);
+    throw new Error('Erreur lors de la création: ' + error.message);
+  }
+  return data;
 }
 
 // Mettre à jour un événement
