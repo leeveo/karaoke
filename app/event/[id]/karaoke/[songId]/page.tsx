@@ -8,7 +8,16 @@ import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 
 export default function EventKaraokePage() {
-  const { id, songId } = useParams();
+  // Extraction sécurisée des paramètres id et songId
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  let songId = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    const rawSongId = params.songId;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+    songId = Array.isArray(rawSongId) ? rawSongId[0] : rawSongId || '';
+  }
   const decodedSongId = decodeURIComponent(songId as string);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
