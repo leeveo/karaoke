@@ -9,7 +9,13 @@ import { Event } from '@/types/event';
 import { FiDownload, FiEye, FiChevronLeft, FiPlay, FiVideo, FiX, FiClock, FiTrash2, FiAlertTriangle, FiCheck, FiCopy } from 'react-icons/fi';
 
 export default function EventVideosAdminPage() {
-  const { id } = useParams();
+  // Correction : extraction sécurisée du paramètre id
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+  }
   const router = useRouter();
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
