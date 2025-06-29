@@ -9,8 +9,13 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 
 export default function EventPage() {
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+  }
+
   const router = useRouter();
 
   const [event, setEvent] = useState<Event | null>(null);
