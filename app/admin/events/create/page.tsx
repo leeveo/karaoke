@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
 import { createEvent } from '@/lib/supabase/events';
 import { EventInput } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
 
 function getUserIdFromCookie(): string | null {
   if (typeof document === 'undefined') return null;
@@ -29,11 +28,10 @@ function getUserIdFromCookie(): string | null {
 }
 
 export default function CreateEventPage() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const router = useRouter();
 
   // Récupérer l'id utilisateur connecté
   useEffect(() => {
@@ -51,7 +49,6 @@ export default function CreateEventPage() {
       return;
     }
     try {
-      setIsSubmitting(true);
       // Ajoute le user_id à l'event
       const eventWithUser = { ...eventData, user_id: userId };
       console.log('[CreateEventPage] Event envoyé à createEvent:', eventWithUser);
@@ -60,7 +57,6 @@ export default function CreateEventPage() {
     } catch (error) {
       console.error("Error creating event:", error);
       setError("Création impossible: " + (error as Error).message);
-      setIsSubmitting(false);
     }
   };
 
