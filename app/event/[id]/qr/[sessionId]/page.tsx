@@ -9,7 +9,16 @@ import { supabase } from '@/lib/supabase/client';
 
 export default function EventQRPage() {
   const searchParams = useSearchParams();
-  const { id, sessionId } = useParams();
+  // Extraction sécurisée des paramètres id et sessionId
+  const params = useParams() as Record<string, string | string[]>;
+  let id = '';
+  let sessionId = '';
+  if (params && typeof params === 'object') {
+    const rawId = params.id;
+    const rawSessionId = params.sessionId;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+    sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '';
+  }
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
