@@ -20,8 +20,8 @@ function generateColor(str: string) {
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [userIdFromCookie, setUserIdFromCookie] = useState<string | null>(null);
-  const [emailFromDb, setEmailFromDb] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const router = useRouter();
 
   // Récupère l'id utilisateur depuis le cookie partagé
@@ -36,32 +36,32 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
         const decodedToken = decodeURIComponent(token);
         const userData = JSON.parse(atob(decodedToken));
         if (userData.userId) {
-          setUserIdFromCookie(userData.userId);
+          setUserId(userData.userId);
         }
       }
     } catch {
-      setUserIdFromCookie(null);
+      setUserId(null);
     }
   }, []);
 
   // Va chercher l'email dans admin_users à partir de l'id utilisateur du cookie
   useEffect(() => {
-    const fetchEmail = async () => {
-      if (userIdFromCookie) {
-        const { data } = await supabase
+    const fetchUser = async () => {
+      if (userId) {
+        const { data, error } = await supabase
           .from('admin_users')
           .select('email')
-          .eq('id', userIdFromCookie)
+          .eq('id', userId)
           .single();
         if (data && data.email) {
-          setEmailFromDb(data.email);
+          setUserEmail(data.email);
         } else {
-          setEmailFromDb(null);
+          setUserEmail(null);
         }
       }
     };
-    fetchEmail();
-  }, [userIdFromCookie]);
+    fetchUser();
+  }, [userId]);
 
   // Fermer le menu au clic extérieur
   useEffect(() => {
@@ -77,14 +77,12 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   }, []);
 
   const handleLogout = async () => {
-    // Si vous avez une route API logout, utilisez-la, sinon gardez signOut
     await supabase.auth.signOut?.();
     router.push('/auth/login');
   };
 
-  const email = emailFromDb || '';
-  const userInitial = email ? email.charAt(0).toUpperCase() : (userIdFromCookie ? userIdFromCookie.charAt(0).toUpperCase() : 'U');
-  const avatarColor = email ? generateColor(email) : (userIdFromCookie ? generateColor(userIdFromCookie) : 'hsl(250, 70%, 45%)');
+  const avatarColor = userEmail ? generateColor(userEmail) : (userId ? generateColor(userId) : 'hsl(250, 70%, 45%)');
+  const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : (userId ? userId.charAt(0).toUpperCase() : 'U');
 
   return (
     <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 lg:px-6">
@@ -115,7 +113,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             <div className="hidden md:flex flex-col items-start">
               <span className="text-sm font-medium text-gray-700">Mon compte</span>
               <span className="text-xs text-gray-500 truncate max-w-[120px]">
-                {email || userIdFromCookie || ''}
+                {userEmail || userId || ''}
               </span>
             </div>
             <svg className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,10 +124,10 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 transition-all duration-200 transform origin-top-right">
               <div className="p-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500">Connecté en tant que:</p>
-                <p className="font-medium text-gray-800 truncate">{email || userIdFromCookie || ''}</p>
-                {userIdFromCookie && (
+                <p className="font-medium text-gray-800 truncate">{userEmail || ''}</p>
+                {userId && (
                   <p className="text-xs text-gray-400 mt-1">
-                    ID utilisateur: <span className="font-mono">{userIdFromCookie}</span>
+                    ID utilisateur: <span className="font-mono">{userId}</span>
                   </p>
                 )}
               </div>
