@@ -9,13 +9,15 @@ import Link from 'next/link';
 import { Event } from '@/types/event'; // Make sure this import is available
 
 export default function VideoPlayerPage() {
-  // Correction : extraction sécurisée des paramètres id et videoKey
-  const params = useParams();
+  // Correction : extraction sécurisée des paramètres id et videoKey sans utiliser 'any'
+  const params = useParams() as Record<string, string | string[]>;
   let id = '';
   let videoKey = '';
   if (params && typeof params === 'object') {
-    id = typeof (params as any).id === 'string' ? (params as any).id : Array.isArray((params as any).id) ? (params as any).id[0] : '';
-    videoKey = typeof (params as any).videoKey === 'string' ? (params as any).videoKey : Array.isArray((params as any).videoKey) ? (params as any).videoKey[0] : '';
+    const rawId = params.id;
+    const rawVideoKey = params.videoKey;
+    id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+    videoKey = Array.isArray(rawVideoKey) ? rawVideoKey[0] : rawVideoKey || '';
   }
   const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
