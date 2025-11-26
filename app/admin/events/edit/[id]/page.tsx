@@ -57,7 +57,19 @@ export default function EditEventPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l&apos;Événement</h1>
-      <EventForm onSubmit={handleSubmit} initialData={event} />
+      <EventForm 
+        onSubmit={handleSubmit} 
+        initialData={{
+          name: event.name,
+          date: event.date,
+          customization: event.customization || {
+            primary_color: '#8b5cf6',
+            secondary_color: '#ec4899',
+            background_image: null,
+            logo: null
+          }
+        }} 
+      />
     </div>
   );
 }
