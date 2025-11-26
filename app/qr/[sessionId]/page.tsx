@@ -17,27 +17,10 @@ export default function QRPage() {
       // If URL is from querystring, verify it works properly
       if (pageUrl) {
         try {
-          // If it's an S3 URL, try to get a signed version
+          // If it's an S3 URL, note that it might have access restrictions
           if (pageUrl.includes('s3.amazonaws.com')) {
             console.log("Processing S3 URL");
-            
-            // Extract the key from the S3 URL
-            const urlObj = new URL(pageUrl);
-            const path = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-            
-            // Try to get a fresh signed URL
-            try {
-              const newSignedUrl = await getSignedUrl(path);
-              if (newSignedUrl) {
-                console.log("Generated new signed URL");
-                setPageUrl(newSignedUrl);
-                sessionStorage.setItem('video-s3-url-signed', newSignedUrl);
-                return;
-              }
-            } catch (signError) {
-              console.warn("Could not generate new signed URL:", signError);
-              // Continue with current URL
-            }
+            setLoadError("Note: S3 URLs might have access restrictions. If sharing doesn't work, try re-uploading.");
           }
           
           // For non-S3 URLs or if signing failed, use direct URL but check access
@@ -352,8 +335,7 @@ export default function QRPage() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="Entrez votre nom"
                   />
@@ -371,8 +353,7 @@ export default function QRPage() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="votre@email.com"
                   />

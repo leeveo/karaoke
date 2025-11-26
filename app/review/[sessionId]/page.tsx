@@ -17,7 +17,10 @@ export default function ReviewPage() {
 
   // Load logo for display
   useEffect(() => {
-    const logo = new Image();
+    // Only run in browser environment
+    if (typeof window === 'undefined') return;
+    
+    const logo = document.createElement('img') as HTMLImageElement;
     logo.src = '/logo/logo.png';
     
     logo.onload = () => {
@@ -29,7 +32,7 @@ export default function ReviewPage() {
     logo.onerror = () => {
       console.error('Review page: Error loading logo');
       // Try alternate path
-      const altLogo = new Image();
+      const altLogo = document.createElement('img') as HTMLImageElement;
       altLogo.src = '/logo.png';
       
       altLogo.onload = () => {
