@@ -181,6 +181,7 @@ export default function EventQRPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [countdown, setCountdown] = useState(45);
 
   useEffect(() => {
     // Rediriger si l'URL n'est pas définie
@@ -203,6 +204,33 @@ export default function EventQRPage() {
       }));
     }
   }, [pageUrl, router, id, event]);
+
+  // Timer de redirection automatique après 15 secondes
+  useEffect(() => {
+    if (!pageUrl) return;
+
+    // Démarrer le compte à rebours
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Redirection après 15 secondes
+    const redirectTimer = setTimeout(() => {
+      router.push(`/event/${id}`);
+    }, 45000);
+
+    // Nettoyer les timers
+    return () => {
+      clearInterval(countdownInterval);
+      clearTimeout(redirectTimer);
+    };
+  }, [pageUrl, router, id]);
 
   // Gérer le changement des champs du formulaire
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -333,13 +361,19 @@ export default function EventQRPage() {
       
       {/* Contenu principal */}
       <div className="z-10 w-full max-w-md flex flex-col items-center">
-        <div className="bg-white bg-opacity-95 p-8 rounded-lg shadow-xl w-full">
+        <div className="p-8 rounded-lg shadow-xl w-full backdrop-blur-md bg-white/20 shadow-2xl"
+          style={{
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+          }}
+        >
           {/* Afficher le nom de l'événement en haut */}
           {event && (
             <div className="mb-4 text-center">
               <h2 
-                className="text-xl font-bold"
-                style={{ color: 'var(--primary-color)' }}
+                className="text-xl font-bold text-white drop-shadow-lg"
+                style={{ color: 'var(--primary-color)', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
               >
                 {event.name}
               </h2>
@@ -347,23 +381,35 @@ export default function EventQRPage() {
           )}
           
           <h1 
-            className="text-2xl font-bold mb-6 text-center"
-            style={{ color: 'var(--primary-color)' }}
+            className="text-2xl font-bold mb-6 text-center text-white drop-shadow-lg"
+            style={{ color: 'var(--primary-color)', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
           >
-            🎉 Votre vidéo est prête !
+             Votre vidéo est prête !
           </h1>
           
-          <p className="mb-6 text-center text-gray-600">
+          <p className="mb-6 text-center text-white drop-shadow-md">
             Scannez ce QR code pour accéder à votre performance
           </p>
           
-          <div className="bg-white p-4 rounded-lg shadow-inner mb-6"
+          <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-inner mb-6"
             style={{
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,1) 70%, rgba(246,240,255,1) 100%)',
-              border: '1px solid rgba(139, 92, 246, 0.1)'
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)'
             }}
           >
             <QRCodeDisplay url={pageUrl} size={250} />
+          </div>
+          
+          {/* Affichage du compte à rebours */}
+          <div className="mb-4 text-center">
+            <p className="text-white drop-shadow-md text-sm">
+              Redirection automatique dans{' '}
+              <span className="font-bold text-lg" style={{ color: 'var(--secondary-color)' }}>
+                {countdown}
+              </span>
+              {' '}seconde{countdown !== 1 ? 's' : ''}
+            </p>
           </div>
           
           {loadError && (

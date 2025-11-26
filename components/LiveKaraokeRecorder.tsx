@@ -392,8 +392,8 @@ function LiveKaraokeRecorderInner({
             
             // Toujours afficher le logo, qu'on soit en enregistrement ou non
             if (logoRef.current && logoLoaded) {
-              // Logo plus grand et plus visible
-              const logoWidth = canvasRef.current.width * 0.20;
+              // Logo réduit de 50% - taille 10% au lieu de 20%
+              const logoWidth = canvasRef.current.width * 0.10;
               const logoHeight = (logoRef.current.height / logoRef.current.width) * logoWidth;
               
               // Position en haut à droite
@@ -777,23 +777,13 @@ function LiveKaraokeRecorderInner({
   };
 
   // Styles du bouton
-  const defaultButtonClassName = "mt-4 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform shadow-lg border border-white/10";
+  const defaultButtonClassName = "mt-4 text-white font-bold py-8 px-16 rounded-2xl transition-all duration-300 transform shadow-2xl border-2 border-white/30 text-3xl";
   const buttonClassName = buttonStyles?.className || defaultButtonClassName;
-  const buttonText = buttonStyles?.text || "Préparez vous !";
+  const buttonText = buttonStyles?.text || "Cliquez ici pour lancer le karaoké";
   const buttonIcon = buttonStyles?.icon || "";
 
   return (
     <div className="w-full flex flex-col items-center justify-center">
-      {/* Debug information in development mode */}
-      {process.env.NODE_ENV !== 'production' && (
-        <div className="fixed top-0 left-0 bg-black/80 text-white p-2 text-xs z-50">
-          webcamRef: {webcamVideoRef.current ? '✓' : '✗'} | 
-          karaokeRef: {karaokeVideoRef.current ? '✓' : '✗'} | 
-          canvasRef: {canvasRef.current ? '✓' : '✗'} | 
-          CameraKit: {cameraKitReady ? '✓' : '✗'}
-        </div>
-      )}
-      
       {/* Vidéos cachées */}
       <video 
         ref={karaokeVideoRef} 
@@ -833,13 +823,13 @@ function LiveKaraokeRecorderInner({
       )}
       
       {/* Canvas principal */}
-      <div className="w-full flex justify-center relative">
+      <div className="w-full h-full flex justify-center relative">
         <canvas 
           ref={canvasRef} 
-          className="w-full max-w-4xl rounded-lg shadow-lg" 
+          className="w-full h-full rounded-lg shadow-lg" 
           style={{ 
-            border: '2px solid', 
-            borderColor: 'var(--primary-color)'
+            maxHeight: '80vh',
+            objectFit: 'contain'
           }}
         />
 

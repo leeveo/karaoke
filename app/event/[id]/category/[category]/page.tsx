@@ -2,12 +2,19 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
-import { getSongsByCategory, Song } from '@/services/s3Service';
+import { Song } from '@/services/s3Service';
 import { motion } from 'framer-motion';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import { supabase } from '@/lib/supabase/client';
-import MusicTransitionLoader from '@/components/MusicTransitionLoader'; // Importer le loader de transition
+import MusicTransitionLoader from '@/components/MusicTransitionLoader';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { EffectCoverflow, Autoplay, Navigation, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/effect-coverflow';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import './swiper-custom.css';
 
 // Fonction de mappage entre les catégories de l'URL et les dossiers S3
 const mapCategoryToS3Folder = (category: string): string => {
@@ -148,7 +155,13 @@ export default function EventCategoryPage() {
         setIsLoading(true);
         if (typeof category === 'string') {
           const s3FolderCategory = mapCategoryToS3Folder(category);
-          const songList = await getSongsByCategory(s3FolderCategory);
+          const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(s3FolderCategory)}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch songs');
+          }
+          
+          const songList = await response.json();
           setSongs(songList);
         }
         setIsLoading(false);
@@ -244,12 +257,196 @@ export default function EventCategoryPage() {
       
       {/* Add loading overlay when fetching songs */}
       {isLoading && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-black/50 p-6 rounded-xl border border-white/10 flex flex-col items-center">
-            <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4"></div>
-            <p className="text-white text-lg">Chargement des chansons...</p>
-          </div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backdropFilter: 'blur(8px)' }}
+        >
+          <div className="absolute inset-0 bg-black/70"></div>
+          
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 30 
+            }}
+            className="relative z-10 p-8 rounded-xl border border-white/10 shadow-2xl max-w-md w-full mx-4 backdrop-blur-md"
+            style={{ 
+              backgroundColor: 'var(--primary-color)',
+              boxShadow: '0 20px 60px -10px rgba(var(--primary-color-rgb), 0.4), 0 10px 20px -5px rgba(var(--secondary-color-rgb), 0.3)',
+              borderLeft: '4px solid var(--primary-color)',
+              borderRight: '4px solid var(--secondary-color)'
+            }}
+          >
+            {/* Vinyl record animation */}
+            <div className="flex justify-center mb-6 relative">
+              <motion.div 
+                className="w-28 h-28 rounded-full bg-gradient-to-br from-black to-gray-900 shadow-inner flex items-center justify-center"
+                animate={{ rotate: 360 }}
+                transition={{ 
+                  duration: 4,
+                  ease: "linear",
+                  repeat: Infinity
+                }}
+                style={{
+                  background: 'conic-gradient(from 0deg, #000, #333, #000, #111, #000)',
+                  boxShadow: '0 0 20px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.8)'
+                }}
+              >
+                {/* Vinyl grooves */}
+                <div className="w-3/4 h-3/4 rounded-full border-t border-white/5"></div>
+                <div className="absolute w-2/3 h-2/3 rounded-full border-t border-white/5"></div>
+                <div className="absolute w-1/2 h-1/2 rounded-full border-t border-white/5"></div>
+                <div className="absolute w-1/3 h-1/3 rounded-full border-t border-white/5"></div>
+                
+                {/* Center label with theme gradient */}
+                <div 
+                  className="absolute w-2/5 h-2/5 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                  style={{ 
+                    background: 'var(--primary-gradient)',
+                    transform: 'rotate(0deg)',
+                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <motion.div
+                    animate={{ rotate: -360 }}
+                    transition={{ 
+                      duration: 4,
+                      ease: "linear",
+                      repeat: Infinity
+                    }}
+                  >
+                    KARAOKE
+                  </motion.div>
+                </div>
+                
+                {/* Center hole */}
+                <div className="absolute w-[8px] h-[8px] rounded-full bg-gray-900 border border-gray-700"></div>
+              </motion.div>
+              
+              {/* Equalizer bars in background */}
+              <div className="absolute -z-10 inset-0 flex items-center justify-center space-x-1">
+                {[...Array(12)].map((_, i) => (
+                  <motion.div 
+                    key={i} 
+                    className="w-1 rounded-full"
+                    style={{ 
+                      backgroundColor: i % 2 === 0 
+                        ? 'var(--primary-color)' 
+                        : 'var(--secondary-color)',
+                      opacity: 0.4,
+                      height: '100%'
+                    }}
+                    animate={{
+                      height: [
+                        `${20 + Math.random() * 40}%`, 
+                        `${60 + Math.random() * 40}%`, 
+                        `${10 + Math.random() * 30}%`
+                      ]
+                    }}
+                    transition={{
+                      duration: 1.2 + Math.random(),
+                      ease: "easeInOut",
+                      repeat: Infinity,
+                      repeatType: "reverse",
+                      delay: i * 0.08
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Audio waveform visualization */}
+            <div className="flex items-end justify-center space-x-1 mb-8 h-12">
+              {[...Array(24)].map((_, i) => (
+                <motion.div 
+                  key={i} 
+                  className="w-1.5 rounded-full"
+                  style={{ 
+                    background: `linear-gradient(to top, var(--${i % 2 ? 'primary' : 'secondary'}-color), transparent)`,
+                    opacity: 0.8
+                  }}
+                  animate={{
+                    height: [
+                      `${10 + Math.random() * 40}%`, 
+                      `${60 + Math.random() * 40}%`, 
+                      `${10 + Math.random() * 30}%`, 
+                      `${50 + Math.random() * 50}%`
+                    ]
+                  }}
+                  transition={{
+                    duration: 1.2,
+                    ease: "easeInOut",
+                    repeat: Infinity,
+                    repeatType: "mirror",
+                    delay: i * 0.05
+                  }}
+                />
+              ))}
+            </div>
+            
+            <motion.h3 
+              className="text-white text-2xl font-bold text-center mb-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{ 
+                background: 'linear-gradient(to right, var(--primary-color), var(--secondary-color))',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >
+              Chargement des chansons...
+            </motion.h3>
+            
+            <motion.p 
+              className="text-gray-300 text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              Préparation de la bibliothèque musicale
+            </motion.p>
+            
+            {/* Music notes floating animation */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute"
+                  style={{ 
+                    color: i % 2 === 0 ? 'var(--primary-color)' : 'var(--secondary-color)',
+                    opacity: 0.15,
+                    fontSize: `${1 + Math.random() * 1.5}rem`
+                  }}
+                  initial={{ 
+                    x: `${Math.random() * 100}%`, 
+                    y: "120%",
+                    rotate: Math.random() * 360
+                  }}
+                  animate={{ 
+                    y: "-20%",
+                    rotate: Math.random() > 0.5 ? 360 : -360
+                  }}
+                  transition={{
+                    duration: 3 + Math.random() * 7,
+                    repeat: Infinity,
+                    repeatType: "loop",
+                    ease: "linear",
+                    delay: Math.random() * 5
+                  }}
+                >
+                  {['♪', '♫', '♩', '♬', '🎵', '🎶'][Math.floor(Math.random() * 6)]}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
       )}
       
       <motion.div 
@@ -267,7 +464,7 @@ export default function EventCategoryPage() {
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
         
-        <div className="relative z-10 w-full max-w-3xl h-full flex flex-col py-6 px-4">
+        <div className="relative z-10 w-full h-full flex flex-col py-6 px-4">
           {/* Partie du haut (titre + bouton retour) - reste fixe */}
           <div className="flex-shrink-0">
             <motion.h1 
@@ -305,127 +502,174 @@ export default function EventCategoryPage() {
             </div>
           </div>
           
-          {/* Zone de défilement des chansons - prend tout l'espace restant */}
-          <div className="relative flex-grow bg-black/20 backdrop-blur-md rounded-xl p-4 border border-white/10 overflow-hidden">
-            <div 
-              className="absolute inset-0 overflow-y-auto p-4 pb-8"
-              style={{
-                // Rétablir la scrollbar native tout en la rendant visible
-                scrollbarWidth: 'auto',
-                scrollbarColor: 'var(--secondary-color) rgba(0, 0, 0, 0.2)',
-                WebkitOverflowScrolling: 'touch',
-                paddingRight: '45px', // Padding augmenté pour accommoder une barre de défilement plus large
-                backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond noir avec opacité
-              }}
-            >
-              {/* Styles de scrollbar plus larges pour les écrans tactiles */}
-              <style jsx global>{`
-                .overflow-y-auto::-webkit-scrollbar {
-                  width: 40px !important; /* Scrollbar beaucoup plus large */
-                  background-color: rgba(0, 0, 0, 0.6); /* Fond noir plus foncé pour la scrollbar */
-                }
-                .overflow-y-auto::-webkit-scrollbar-track {
-                  background: rgba(0, 0, 0, 0.5);
-                  border-radius: 20px;
-                  margin: 2px;
-                  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.5);
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb {
-                  background: var(--secondary-color);
-                  border-radius: 20px;
-                  border: 4px solid rgba(0, 0, 0, 0.4);
-                  min-height: 120px; /* Hauteur minimale augmentée */
-                  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-                  background: var(--secondary-light);
-                }
-              `}</style>
-              
-              <ul className="flex flex-col w-full space-y-3">
-                {songs.length === 0 ? (
-                  <motion.li 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center text-white border border-white/10 shadow-xl"
-                  >
-                    Aucune chanson trouvée dans cette catégorie
-                  </motion.li>
-                ) : (
-                  songs.map((song, index) => (
-                    <motion.li
-                      key={song.key}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="backdrop-blur-md rounded-xl overflow-hidden border-white/10 hover:border-white/20 transition-all transform hover:translate-y-[-2px] shadow-lg"
-                      style={{ 
-                        backgroundColor: 'var(--primary-color-75)',
-                        border: 'none',
-                        borderLeft: '4px solid var(--primary-color)',
-                        borderRight: '4px solid var(--secondary-color)', // Fixed: removed single quotes inside var()
-                        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
-                      }}
+          {/* Zone du slider Swiper - prend tout l'espace restant */}
+          <div className="relative flex-grow flex items-center justify-center w-full">
+            {songs.length === 0 ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center text-white border border-white/10 shadow-xl"
+              >
+                Aucune chanson trouvée dans cette catégorie
+              </motion.div>
+            ) : (
+              <Swiper
+                effect={'coverflow'}
+                grabCursor={true}
+                centeredSlides={true}
+                slidesPerView={3}
+                spaceBetween={30}
+                loop={true}
+                autoplay={{
+                  delay: 4000,
+                  disableOnInteraction: false,
+                }}
+                coverflowEffect={{
+                  rotate: 15,
+                  stretch: 0,
+                  depth: 200,
+                  modifier: 1.5,
+                  slideShadows: false,
+                }}
+                navigation={true}
+                pagination={false}
+                modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
+                className="w-full h-full"
+                breakpoints={{
+                  320: { slidesPerView: 1, spaceBetween: 20 },
+                  768: { slidesPerView: 2, spaceBetween: 25 },
+                  1024: { slidesPerView: 3, spaceBetween: 30 },
+                }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  paddingTop: '50px',
+                  paddingBottom: '80px',
+                }}
+              >
+                {songs.map((song, index) => (
+                  <SwiperSlide key={song.key}>
+                    <motion.div
+                      whileHover={{ scale: 1.02, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="cursor-pointer h-full w-full flex items-center justify-center"
+                      onClick={() => handleSongSelect(song.key)}
                     >
-                      <div className="p-4 flex justify-between items-center">
-                        <div>
-                          <h3 className="text-xl font-bold text-white uppercase">{song.title}</h3>
-                          <p className="text-gray-200 mt-1">{song.artist}</p>
+                      {/* Glassmorphism Card */}
+                      <div className="relative w-full rounded-3xl overflow-hidden group shadow-2xl border border-white" style={{ height: '400px' }}>
+                        {/* Background Image with Blur */}
+                        <div className="absolute inset-0">
+                          {song.imageUrl ? (
+                            <img
+                              src={song.imageUrl}
+                              alt={song.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div 
+                              className="w-full h-full"
+                              style={{
+                                background: `linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)`
+                              }}
+                            />
+                          )}
+                          {/* Gradient Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                         </div>
-                        <button
-                          onClick={() => handleSongSelect(song.key)} // Utiliser la nouvelle fonction avec animation
-                          className="relative btn-secondary px-6 py-3 rounded-xl shadow-lg hover:shadow-2xl transition-all flex items-center gap-3 font-bold uppercase group"
-                          style={{ 
-                            background: 'var(--secondary-gradient)',
-                            color: 'white',
-                            transform: 'translateZ(0)',
-                            borderRadius: '1rem',
-                            border: 'none',
-                            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3), inset 0 2px 10px rgba(255, 255, 255, 0.3)',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {/* Effet lumineux sur le bouton */}
+
+                        {/* Glassmorphism Layer */}
+                        <div className="absolute inset-0 backdrop-blur-[2px] bg-white/5 border border-white/20 rounded-3xl">
+                          {/* Shine Effect */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-50" />
+                          
+                          {/* Inner Glow */}
+                          <div className="absolute inset-0 rounded-3xl shadow-[inset_0_0_60px_rgba(255,255,255,0.1)]" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="relative h-full flex flex-col justify-end p-6 z-10">
+                          {/* Play Button - Centered */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="relative">
+                              {/* Outer Glow */}
+                              <div 
+                                className="absolute inset-0 rounded-full blur-xl opacity-60 animate-pulse"
+                                style={{
+                                  background: `linear-gradient(to right, var(--secondary-color), var(--primary-color))`
+                                }}
+                              />
+                              
+                              {/* Glassmorphism Button */}
+                              <div className="relative w-24 h-24 rounded-full backdrop-blur-md bg-white/10 border-2 border-white/30 flex items-center justify-center shadow-2xl hover:scale-110 transition-transform duration-300">
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
+                                  <svg className="w-10 h-10 text-white ml-1 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Song Info with Glassmorphism */}
                           <div 
-                            className="absolute inset-0 opacity-0 group-hover:opacity-50 transition-opacity duration-300"
+                            className="rounded-2xl p-5 border border-white/50 shadow-2xl transform group-hover:translate-y-[-10px] transition-transform duration-300"
                             style={{
-                              background: `radial-gradient(circle at center, var(--primary-light), transparent 70%)`,
-                              mixBlendMode: 'overlay'
+                              backdropFilter: 'blur(20px)',
+                              WebkitBackdropFilter: 'blur(20px)',
+                              background: 'rgba(255, 255, 255, 0.15)'
                             }}
-                          ></div>
-                          
-                          {/* Bordures animées */}
-                          <div className="absolute inset-0 rounded-xl" style={{ 
-                            border: '2px solid transparent',
-                            borderLeftColor: 'var(--primary-color)',
-                            borderRightColor: 'var(--secondary-color)',
-                            boxSizing: 'border-box'
-                          }}></div>
-                          
-                          <span className="relative z-10 text-white font-bold">Je choisis</span>
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            className="h-5 w-5 relative z-10 transition-transform group-hover:translate-x-1" 
-                            viewBox="0 0 20 20" 
-                            fill="currentColor"
                           >
-                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                            {/* Title */}
+                            <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg line-clamp-2">
+                              {song.title}
+                            </h3>
+                            
+                            {/* Artist */}
+                            <p className="text-lg text-white drop-shadow-md line-clamp-1 mb-3">
+                              {song.artist}
+                            </p>
+
+                            {/* Decorative Line */}
+                            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/60 to-transparent mb-3" />
+
+                            {/* Tags/Badges */}
+                            <div className="flex gap-2 flex-wrap">
+                              <span 
+                                className="px-3 py-1 rounded-full text-xs font-medium border border-white/50 text-white shadow-lg"
+                                style={{
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  background: 'rgba(255, 255, 255, 0.2)'
+                                }}
+                              >
+                                🎤 Karaoke
+                              </span>
+                              <span 
+                                className="px-3 py-1 rounded-full text-xs font-medium border border-white/50 text-white shadow-lg"
+                                style={{
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  background: `linear-gradient(to right, var(--secondary-color, rgba(236, 72, 153, 0.4)), var(--primary-color, rgba(168, 85, 247, 0.4)))`
+                                }}
+                              >
+                                ✨ Populaire
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Corner Accent */}
+                          <div className="absolute top-4 right-4 w-16 h-16 rounded-full bg-gradient-to-br from-white/20 to-transparent backdrop-blur-md border border-white/30 flex items-center justify-center">
+                            <span className="text-2xl">🎵</span>
+                          </div>
+                        </div>
+
+                        {/* Hover Border Glow */}
+                        <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_0_60px_rgba(168,85,247,0.6)]"></div>
                       </div>
-                    </motion.li>
-                  ))
-                )}
-              </ul>
-            </div>
-            
-            {/* Ajout d'un élément décoratif pour le fond de la scrollbar */}
-            <div className="absolute right-0 top-0 bottom-0 w-[60px] bg-black/70 backdrop-blur-sm pointer-events-none">
-              {/* Élément purement visuel */}
-            </div>
-            
-            {songs.length > 5 && (
-              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/40 to-transparent pointer-events-none rounded-b-xl"></div>
+                    </motion.div>
+                  </SwiperSlide>
+                ))}
+              </Swiper>
             )}
           </div>
         </div>

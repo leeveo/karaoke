@@ -215,37 +215,8 @@ export default function EventPage() {
           )}
         </div>
         
-        {/* Main content */}
-        <motion.div 
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 
-            className="text-4xl md:text-5xl font-bold mb-6"
-            style={{ 
-              color: 'var(--primary-color)',
-              WebkitTextStroke: "2px rgba(255, 255, 255, 0.5)",
-              textShadow: "0 2px 4px rgba(0,0,0,0.3)"
-            }}
-          >
-            Chante maintenant !
-          </h2>
-          <p 
-            className="text-xl max-w-xl mx-auto"
-            style={{ 
-              color: 'var(--secondary-color)',
-              WebkitTextStroke: "1px rgba(255, 255, 255, 0.5)",
-              textShadow: "0 1px 3px rgba(0,0,0,0.3)"
-            }}
-          >
-            Choisis une catégorie de chansons et commence à chanter. Les vidéos seront enregistrées et partagées avec les participants.
-          </p>
-        </motion.div>
-        
         {/* Catégories */}
-        <div className="w-full max-w-4xl">
+        <div className="w-full">
           <CategorySelector eventId={id} />
         </div>
       </div>

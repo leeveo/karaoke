@@ -278,7 +278,7 @@ export default function EventKaraokePage() {
 
   // Main content
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8"
+    <div className="min-h-screen flex flex-col items-center justify-center p-2"
       style={{
         backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
           ? `url('${event.customization.backgroundImageUrl}')` 
@@ -290,44 +290,17 @@ export default function EventKaraokePage() {
       {/* Overlay avec dégradé */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
       
-      {/* Event name display */}
-      {event && (
-        <div className="relative z-10 mb-6 w-full max-w-5xl text-center">
-          <h2 className="text-xl font-medium" style={{ color: 'var(--primary-color)' }}>
-            {event.name}
-          </h2>
-        </div>
-      )}
-      
-      <div className="relative z-10 w-full max-w-5xl">
-        <div className="flex justify-center mb-6">
-          <button
-            onClick={handleReturn}
-            className="py-3 px-6 rounded-lg flex items-center gap-2 text-white hover:translate-y-[-2px] transition-all"
-            style={{ 
-              backgroundColor: 'var(--primary-color-75)',
-              borderLeft: '3px solid var(--primary-color)',
-              borderRight: '3px solid var(--secondary-color)',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            <span>Retour événement</span>
-          </button>
-        </div>
-        
+      <div className="relative z-10 w-full h-screen flex items-center justify-center px-2 py-2">
         {videoReady ? (
-          <div className="relative flex justify-center w-full">
+          <div className="relative flex justify-center w-full h-full max-h-screen">
             {/* Bordure néon */}
             <div className="absolute -inset-1 bg-gradient-to-r from-gray-300 to-gray-100 rounded-2xl blur opacity-75 transition duration-1000"></div>
             
-            {/* Conteneur vidéo */}
-            <div className="relative bg-black/60 p-6 sm:p-8 rounded-2xl shadow-2xl border border-white/10 w-full">
+            {/* Conteneur vidéo - padding retiré pour coller la bordure */}
+            <div className="relative bg-black/60 rounded-2xl shadow-2xl border border-white/10 w-full h-full flex items-center justify-center overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-2xl pointer-events-none"></div>
               
-              <div className="rounded-xl overflow-hidden flex justify-center">
+              <div className="w-full h-full flex justify-center items-center">
                 <LiveKaraokeRecorder 
                   karaokeSrc={videoUrl} 
                   preloaded={true} 
@@ -349,13 +322,6 @@ export default function EventKaraokePage() {
             </div>
           </div>
         )}
-        
-        {/* Suggestions d'utilisation */}
-        <div className="mt-10 text-center">
-          <p className="text-gray-300 text-sm bg-black/30 backdrop-blur-sm inline-block px-6 py-3 rounded-full border border-gray-700/50 shadow-inner">
-            🎧 Utilisez un casque pour de meilleurs résultats
-          </p>
-        </div>
       </div>
       
       {/* Vidéo cachée pour le préchargement */}

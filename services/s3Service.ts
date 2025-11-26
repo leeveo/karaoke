@@ -1,17 +1,31 @@
-import { S3Client, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// Configuration du client S3
-const s3Client = new S3Client({
-  region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
-  credentials: {
-    accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
-  },
-});
-
-const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET || 'leeveostockage';
+const BUCKET_NAME = process.env.NEXT_PUBLIC_AWS_S3_BUCKET || 'leeveostockage';
 const BASE_PATH = 'karaokesaas';
+
+// Client S3 pour les opérations de vidéo côté client (avec credentials publiques)
+// Note: Pour les chansons, on utilise l'API route côté serveur
+const getS3ClientForVideos = () => {
+  // On vérifie si on a les credentials côté client
+  if (typeof window !== 'undefined') {
+    return new S3Client({
+      region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
+      credentials: {
+        accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
+      },
+    });
+  }
+  // Côté serveur, on utilise les credentials sans préfixe
+  return new S3Client({
+    region: process.env.AWS_REGION || process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
+    },
+  });
+};
 
 export interface Song {
   key: string;
@@ -19,6 +33,7 @@ export interface Song {
   artist: string;
   size?: number;
   lastModified?: Date;
+  imageUrl?: string;
 }
 
 // Fonction améliorée pour extraire le titre et l'artiste du nom de fichier
@@ -51,44 +66,34 @@ function parseFileName(fileName: string): { title: string; artist: string } {
 
 export async function getCategories(): Promise<string[]> {
   try {
-    console.log("Service S3: Récupération des catégories");
+    console.log("Service S3: Récupération des catégories via API");
+    
     // Vérifier d'abord si nous avons des catégories en cache
-    const cachedCategories = sessionStorage.getItem('s3-categories');
-    if (cachedCategories) {
-      console.log("Utilisation des catégories en cache");
-      return JSON.parse(cachedCategories);
+    if (typeof window !== 'undefined') {
+      const cachedCategories = sessionStorage.getItem('s3-categories');
+      if (cachedCategories) {
+        console.log("Utilisation des catégories en cache");
+        return JSON.parse(cachedCategories);
+      }
     }
     
-    const command = new ListObjectsV2Command({
-      Bucket: BUCKET_NAME,
-      Prefix: BASE_PATH + '/',
-      Delimiter: '/'
-    });
-
-    const response = await s3Client.send(command);
-    const categories: string[] = [];
-
-    if (response.CommonPrefixes && response.CommonPrefixes.length > 0) {
-      for (const prefix of response.CommonPrefixes) {
-        if (prefix.Prefix) {
-          const category = prefix.Prefix.replace(BASE_PATH + '/', '').replace('/', '');
-          if (category) {
-            categories.push(category);
-          }
-        }
-      }
-      
-      console.log("Catégories trouvées:", categories);
-      // Mettre en cache les catégories pour les futurs appels
-      sessionStorage.setItem('s3-categories', JSON.stringify(categories));
-      
-      return categories;
-    } else {
-      console.warn("Aucun préfixe commun trouvé pour les catégories");
-      // Utiliser des catégories par défaut en cas d'erreur
-      const defaultCategories = ['pop', 'rock', 'rap', 'français', 'anglais', 'latino'];
-      return defaultCategories;
+    // Appel à l'API route côté serveur
+    const response = await fetch('/api/songs?action=categories');
+    
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des catégories');
     }
+    
+    const categories = await response.json();
+    
+    console.log("Catégories trouvées:", categories);
+    
+    // Mettre en cache les catégories pour les futurs appels
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('s3-categories', JSON.stringify(categories));
+    }
+    
+    return categories;
   } catch (error) {
     console.error('Erreur lors de la récupération des catégories:', error);
     // Utiliser des catégories par défaut en cas d'erreur
@@ -98,35 +103,18 @@ export async function getCategories(): Promise<string[]> {
 
 export async function getSongsByCategory(category: string): Promise<Song[]> {
   try {
-    const command = new ListObjectsV2Command({
-      Bucket: BUCKET_NAME,
-      Prefix: `${BASE_PATH}/${category}/`
-    });
-
-    const response = await s3Client.send(command);
-    const songs: Song[] = [];
-
-    if (response.Contents) {
-      for (const item of response.Contents) {
-        // Ne pas inclure le dossier lui-même ou les fichiers cachés
-        if (item.Key && 
-            item.Key !== `${BASE_PATH}/${category}/` && 
-            !item.Key.split('/').pop()?.startsWith('.')) {
-          
-          const fileName = item.Key.split('/').pop() || '';
-          const { title, artist } = parseFileName(fileName);
-          
-          songs.push({
-            key: item.Key,
-            title,
-            artist,
-            size: item.Size,
-            lastModified: item.LastModified
-          });
-        }
-      }
+    console.log(`Récupération des chansons pour la catégorie: ${category}`);
+    
+    // Appel à l'API route côté serveur
+    const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(category)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la récupération des chansons: ${response.statusText}`);
     }
-
+    
+    const songs = await response.json();
+    console.log(`${songs.length} chansons trouvées pour ${category}`);
+    
     return songs;
   } catch (error) {
     console.error('Erreur lors de la récupération des chansons:', error);
@@ -134,20 +122,39 @@ export async function getSongsByCategory(category: string): Promise<Song[]> {
   }
 }
 
-// Fonction pour obtenir une URL de chanson
+// Fonction pour obtenir une URL de chanson signée
 export async function getSongUrl(key: string): Promise<string> {
   try {
-    console.log(`Demande d'URL pour: ${key}`);
+    console.log(`Demande d'URL signée pour: ${key}`);
     
-    // Générer l'URL directement sans vérifier l'existence (évite les problèmes CORS)
-    const url = `https://${BUCKET_NAME}.s3.${process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3'}.amazonaws.com/${key}`;
-    console.log(`URL générée: ${url}`);
+    // Vérifier le cache d'abord
+    if (typeof window !== 'undefined') {
+      const cachedUrl = sessionStorage.getItem(`s3-url-${key}`);
+      if (cachedUrl) {
+        console.log("Utilisation de l'URL en cache:", cachedUrl);
+        return cachedUrl;
+      }
+    }
+    
+    // Appel à l'API route pour obtenir une URL signée
+    const response = await fetch(`/api/songs?action=url&key=${encodeURIComponent(key)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la récupération de l'URL: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const url = data.url;
+    
+    console.log(`URL signée générée: ${url}`);
     
     // Cache l'URL réussie pour référence future
-    try {
-      sessionStorage.setItem(`s3-url-${key}`, url);
-    } catch (e) {
-      console.warn("Impossible de mettre en cache l'URL:", e);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(`s3-url-${key}`, url);
+      } catch (e) {
+        console.warn("Impossible de mettre en cache l'URL:", e);
+      }
     }
     
     return url;
@@ -155,14 +162,16 @@ export async function getSongUrl(key: string): Promise<string> {
     console.error('Erreur lors de la récupération de l\'URL de la chanson:', error);
     
     // Tenter de récupérer une URL précédemment mise en cache
-    try {
-      const cachedUrl = sessionStorage.getItem(`s3-url-${key}`);
-      if (cachedUrl) {
-        console.log("Utilisation de l'URL en cache:", cachedUrl);
-        return cachedUrl;
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedUrl = sessionStorage.getItem(`s3-url-${key}`);
+        if (cachedUrl) {
+          console.log("Utilisation de l'URL en cache après erreur:", cachedUrl);
+          return cachedUrl;
+        }
+      } catch (e) {
+        // Ignorer les erreurs de session storage
       }
-    } catch (e) {
-      // Ignorer les erreurs de session storage
     }
     
     // Fallback: retourner une URL directe même en cas d'erreur
@@ -181,6 +190,8 @@ export interface VideoItem {
 export async function getEventVideos(eventId: string): Promise<VideoItem[]> {
   try {
     console.log(`Recherche des vidéos pour l'événement: ${eventId}`);
+    
+    const s3Client = getS3ClientForVideos();
     
     const command = new ListObjectsV2Command({
       Bucket: BUCKET_NAME,
@@ -230,13 +241,7 @@ export async function getEventVideos(eventId: string): Promise<VideoItem[]> {
  */
 export async function getSignedVideoUrl(videoPath: string): Promise<string | null> {
   try {
-    const s3Client = new S3Client({
-      region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
-      credentials: {
-        accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    const s3Client = getS3ClientForVideos();
 
     const command = new GetObjectCommand({
       Bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET || 'leeveostockage',
@@ -261,13 +266,7 @@ export async function getSignedVideoUrl(videoPath: string): Promise<string | nul
 export async function deleteS3Video(videoKey: string): Promise<boolean> {
   try {
     console.log(`Suppression de la vidéo: ${videoKey}`);
-    const s3Client = new S3Client({
-      region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
-      credentials: {
-        accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    const s3Client = getS3ClientForVideos();
     
     const command = new DeleteObjectCommand({
       Bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET || 'leeveostockage',
@@ -304,13 +303,7 @@ export async function deleteAllEventVideos(eventId: string): Promise<{
     
     // 2. Supprimer chaque vidéo
     let deletedCount = 0;
-    const s3Client = new S3Client({
-      region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3',
-      credentials: {
-        accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
+    const s3Client = getS3ClientForVideos();
     
     for (const video of videos) {
       try {
