@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
       const response = await s3Client.send(command);
       const songs: Song[] = [];
-      const fileMap = new Map<string, { video?: any; image?: string }>();
+      const fileMap = new Map<string, { video?: { Key: string; LastModified?: Date; Size?: number }; image?: string }>();
 
       // Premier passage : regrouper les fichiers vidéo et image
       if (response.Contents) {
@@ -172,12 +172,13 @@ export async function GET(request: NextRequest) {
       { error: 'Action non valide' },
       { status: 400 }
     );
-  } catch (error: any) {
-    console.error('[API Songs] Erreur:', error);
+  } catch (error: unknown) {
+    const err = error as Error & { $metadata?: { httpStatusCode?: number } };
+    console.error('[API Songs] Erreur:', err);
     console.error('[API Songs] Détails:', {
-      name: error.name,
-      message: error.message,
-      code: error.$metadata?.httpStatusCode,
+      name: err.name,
+      message: err.message,
+      code: err.$metadata?.httpStatusCode,
       requestId: error.$metadata?.requestId
     });
     
