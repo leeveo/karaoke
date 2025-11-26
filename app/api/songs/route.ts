@@ -177,19 +177,19 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   } catch (error: unknown) {
-    const err = error as Error & { $metadata?: { httpStatusCode?: number } };
+    const err = error as Error & { $metadata?: { httpStatusCode?: number; requestId?: string }; message?: string };
     console.error('[API Songs] Erreur:', err);
     console.error('[API Songs] Détails:', {
       name: err.name,
       message: err.message,
       code: err.$metadata?.httpStatusCode,
-      requestId: error.$metadata?.requestId
+      requestId: err.$metadata?.requestId
     });
     
     return NextResponse.json(
       { 
         error: 'Erreur lors de la récupération des données',
-        details: error.message 
+        details: err.message || 'Unknown error'
       },
       { status: 500 }
     );
