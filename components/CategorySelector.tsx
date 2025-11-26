@@ -105,6 +105,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 // Get icon for a category (with fallback)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getCategoryIcon = (category: string): React.ReactNode => {
   return categoryIcons[category.toLowerCase()] || (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12">

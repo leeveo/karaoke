@@ -67,7 +67,7 @@ function LiveKaraokeRecorderInner({
     isInitialized,
     setWebcamElement,
     session,
-    cameraKitReady
+    cameraKitReady // eslint-disable-line @typescript-eslint/no-unused-vars
   } = useCameraKit();
 
   // Charger l'événement et son logo

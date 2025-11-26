@@ -547,7 +547,7 @@ export default function EventCategoryPage() {
                   paddingBottom: '80px',
                 }}
               >
-                {songs.map((song, index) => (
+                {songs.map((song) => (
                   <SwiperSlide key={song.key}>
                     <motion.div
                       whileHover={{ scale: 1.02, y: -10 }}

@@ -1,5 +1,5 @@
 import { Event, EventInput } from '@/types/event';
-import { supabase, getCurrentUser } from './client';
+import { supabase } from './client';
 
 // Récupérer tous les événements avec leur personnalisation
 export async function fetchEvents(): Promise<Event[]> {

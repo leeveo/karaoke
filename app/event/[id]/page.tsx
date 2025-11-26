@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import CategorySelector from '@/components/CategorySelector';
-import { motion } from 'framer-motion';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import Image from 'next/image';
