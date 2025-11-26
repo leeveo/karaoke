@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
       const response = await s3Client.send(command);
       const songs: Song[] = [];
-      const fileMap = new Map<string, { video?: { Key: string; LastModified?: Date; Size?: number }; image?: string }>();
+      const fileMap = new Map<string, { video?: { Key?: string; LastModified?: Date; Size?: number }; image?: string }>();
 
       // Premier passage : regrouper les fichiers vidéo et image
       if (response.Contents) {
@@ -123,7 +123,11 @@ export async function GET(request: NextRequest) {
             const fileData = fileMap.get(baseName)!;
             
             if (fileName.match(/\.mp4$/i)) {
-              fileData.video = item;
+              fileData.video = {
+                Key: item.Key,
+                LastModified: item.LastModified,
+                Size: item.Size
+              };
             } else if (fileName.match(/\.(png|jpg|jpeg)$/i)) {
               // Construire l'URL de l'image
               fileData.image = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'eu-west-3'}.amazonaws.com/${item.Key}`;
@@ -134,7 +138,7 @@ export async function GET(request: NextRequest) {
 
       // Deuxième passage : créer les objets Song
       for (const [baseName, fileData] of fileMap.entries()) {
-        if (fileData.video) {
+        if (fileData.video && fileData.video.Key) {
           const { title, artist } = parseFileName(baseName);
           
           songs.push({
