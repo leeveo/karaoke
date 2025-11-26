@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       success: true,
-      messageId: data.messageId 
+      messageId: (data as { messageId?: string }).messageId || 'sent'
     });
   } catch (error) {
     console.error('Erreur lors de l\'envoi de l\'email via Brevo:', error);
