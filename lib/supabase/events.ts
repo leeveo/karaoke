@@ -126,7 +126,7 @@ export async function updateEvent(id: string, eventData: EventInput): Promise<bo
     console.log("updateEvent: Data to update:", JSON.stringify(eventData, null, 2));
     
     // First verify the event exists
-    const { data: eventExists, error: checkError } = await supabase
+    const { error: checkError } = await supabase
       .from('events')
       .select('id')
       .eq('id', id)

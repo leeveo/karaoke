@@ -56,15 +56,12 @@ function LiveKaraokeRecorderInner({
   const [webcamReady, setWebcamReady] = useState(false);
   const [karaokeReady, setKaraokeReady] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  const [status, setStatus] = useState<string>("Initialisation...");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStep, setProcessingStep] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [useSnapFilters, setUseSnapFilters] = useState(false);
   
   // Utiliser le contexte CameraKit
   const { 
-    isInitialized,
     setWebcamElement,
     session
   } = useCameraKit();
@@ -202,8 +199,6 @@ function LiveKaraokeRecorderInner({
 
     const setup = async () => {
       try {
-        setStatus("Configuration...");
-        
         // 1. Configurer la vidéo karaoké
         if (karaokeVideoRef.current) {
           karaokeVideoRef.current.crossOrigin = "anonymous";
@@ -221,22 +216,21 @@ function LiveKaraokeRecorderInner({
           karaokeVideoRef.current.oncanplay = () => {
             console.log("Vidéo karaoké prête");
             setKaraokeReady(true);
-            setStatus(webcamReady ? "Prêt à enregistrer" : "En attente de la webcam...");
           };
           
-          karaokeVideoRef.current.onerror = () => {  // Remove unused 'e' parameter here
+          karaokeVideoRef.current.onerror = () => {
             console.error("Erreur vidéo:", karaokeVideoRef.current?.error);
-            setStatus(`Erreur vidéo: ${karaokeVideoRef.current?.error?.message || 'inconnue'}`);
           };
         } else {
           console.error("Élément vidéo karaoké non disponible");
-          setStatus("Erreur: élément vidéo karaoké non disponible");
           return;
         }
         
         // 2. Activer la webcam
-        setStatus("Accès à la webcam...");
         try {
+          // Petit délai pour s'assurer que les refs sont bien initialisés
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
               facingMode: 'user',
@@ -259,19 +253,16 @@ function LiveKaraokeRecorderInner({
             console.log("Webcam activée");
           } else {
             console.error("Élément vidéo webcam non disponible");
-            setStatus("Erreur: élément vidéo webcam non disponible");
             return;
           }
         } catch (webcamError) {
           console.error("Erreur d'accès à la webcam:", webcamError);
-          setStatus(`Erreur d'accès à la webcam: ${webcamError instanceof Error ? webcamError.message : 'Accès refusé ou webcam non disponible'}`);
           return;
         }
         
         // 3. Initialiser le canvas
         if (!canvasRef.current) {
           console.error("Élément canvas non disponible");
-          setStatus("Erreur: élément canvas non disponible");
           return;
         }
         
@@ -294,7 +285,6 @@ function LiveKaraokeRecorderInner({
           
           if (!audioDestinationRef.current) {
             console.error("Destination audio non disponible");
-            setStatus("Erreur: destination audio non disponible");
             return;
           }
           
@@ -329,7 +319,6 @@ function LiveKaraokeRecorderInner({
           };
         } catch (recorderError) {
           console.error("Erreur de configuration de l'enregistreur:", recorderError);
-          setStatus(`Erreur d'enregistrement: ${recorderError instanceof Error ? recorderError.message : 'Configuration impossible'}`);
           return;
         }
         
@@ -345,7 +334,7 @@ function LiveKaraokeRecorderInner({
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
             
             // Dessiner la webcam ou le flux Camera Kit
-            if (useSnapFilters && session?.output?.live) {
+            if (session?.output?.live) {
               try {
                 // Dessiner le canvas de Camera Kit qui contient déjà les filtres
                 ctx.drawImage(
@@ -441,11 +430,8 @@ function LiveKaraokeRecorderInner({
         // Démarrer la boucle de dessin
         drawFrame();
         
-        setStatus("Prêt à enregistrer");
-        
       } catch (err) {
         console.error("Erreur lors de l'initialisation:", err);
-        setStatus(`Erreur: ${err instanceof Error ? err.message : "initialisation"}`);
       }
     };
 
@@ -461,22 +447,26 @@ function LiveKaraokeRecorderInner({
         mediaRecorderRef.current.stop();
       }
 
-      if (karaokeVideoRef.current) {
-        karaokeVideoRef.current.pause();
+      const karaokeVideo = karaokeVideoRef.current;
+      const webcamVideo = webcamVideoRef.current;
+      const audioContext = audioContextRef.current;
+
+      if (karaokeVideo) {
+        karaokeVideo.pause();
       }
       
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.pause();
+      if (webcamVideo) {
+        webcamVideo.pause();
         
-        const tracks = (webcamVideoRef.current.srcObject as MediaStream)?.getTracks();
+        const tracks = (webcamVideo.srcObject as MediaStream)?.getTracks();
         tracks?.forEach((track) => track.stop());
       }
 
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(() => {});
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close().catch(() => {});
       }
     };
-  }, [karaokeSrc, router, songId, useSnapFilters, setWebcamElement, session, logoLoaded]);
+  }, [karaokeSrc, router, songId, eventId, recordingStarted, webcamReady, setWebcamElement, session, logoLoaded]);
 
   // Charger directement un logo par défaut lors du premier render
   useEffect(() => {
@@ -563,7 +553,6 @@ function LiveKaraokeRecorderInner({
   // Fonction pour démarrer l'enregistrement
   const startRecording = async () => {
     if (!audioContextRef.current || !karaokeVideoRef.current || !mediaRecorderRef.current || !audioDestinationRef.current) {
-      setStatus("Le système n'est pas prêt");
       return;
     }
     
@@ -573,7 +562,6 @@ function LiveKaraokeRecorderInner({
     }
     
     try {
-      setStatus("Démarrage de l'enregistrement...");
       playingRef.current = true;
       
       // S'assurer que la vidéo est prête
@@ -700,7 +688,6 @@ function LiveKaraokeRecorderInner({
           console.warn("Audio playback failed, continuing anyway");
         });
         
-        setStatus("Enregistrement en cours");
       } catch (playError) {
         console.error("Erreur lors de la lecture:", playError);
         alert("Veuillez interagir avec la page pour autoriser la lecture audio");
@@ -708,7 +695,6 @@ function LiveKaraokeRecorderInner({
       }
     } catch (err) {
       console.error("Erreur au démarrage de l'enregistrement:", err);
-      setStatus(`Erreur: ${err instanceof Error ? err.message : "démarrage"}`);
       playingRef.current = false;
       
       // S'assurer que l'enregistrement est arrêté en cas d'erreur
@@ -830,7 +816,7 @@ function LiveKaraokeRecorderInner({
               }
               style={
                 webcamReady && karaokeReady && !playingRef.current
-                  ? { background: 'var(--secondary-gradient)', backgroundOpacity: 0.9 }
+                  ? { background: 'var(--secondary-gradient)', opacity: 0.9 }
                   : {}
               }
             >
