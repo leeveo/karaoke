@@ -199,6 +199,16 @@ function LiveKaraokeRecorderInner({
 
     const setup = async () => {
       try {
+        // Ensure video elements are in the DOM before proceeding
+        const karaokeInDOM = karaokeVideoRef.current && document.body.contains(karaokeVideoRef.current);
+        const webcamInDOM = webcamVideoRef.current && document.body.contains(webcamVideoRef.current);
+        
+        if (!karaokeInDOM || !webcamInDOM) {
+          console.warn("Video elements not yet in DOM, retrying setup...");
+          setTimeout(() => setup(), 50);
+          return;
+        }
+        
         // 1. Configurer la vidéo karaoké
         if (karaokeVideoRef.current) {
           karaokeVideoRef.current.crossOrigin = "anonymous";
@@ -243,8 +253,13 @@ function LiveKaraokeRecorderInner({
           // IMPORTANT: Vérifier que l'élément vidéo est disponible avant d'y accéder
           if (webcamVideoRef.current) {
             webcamVideoRef.current.srcObject = stream;
-            await webcamVideoRef.current.play();
-            setWebcamReady(true);
+            try {
+              await webcamVideoRef.current.play();
+              setWebcamReady(true);
+            } catch (playError) {
+              console.warn("Webcam play error (may require user interaction):", playError);
+              setWebcamReady(true); // Set ready anyway, user interaction might be needed
+            }
             
             // Initialiser Camera Kit avec le flux webcam
             console.log("Setting webcam element for CameraKit");
@@ -253,6 +268,11 @@ function LiveKaraokeRecorderInner({
             console.log("Webcam activée");
           } else {
             console.error("Élément vidéo webcam non disponible");
+            // Wait a moment and retry if refs aren't ready
+            if (!webcamVideoRef.current && karaokeVideoRef.current) {
+              console.log("Webcam ref not ready, retrying setup...");
+              setTimeout(() => setup(), 100);
+            }
             return;
           }
         } catch (webcamError) {
@@ -552,7 +572,19 @@ function LiveKaraokeRecorderInner({
 
   // Fonction pour démarrer l'enregistrement
   const startRecording = async () => {
-    if (!audioContextRef.current || !karaokeVideoRef.current || !mediaRecorderRef.current || !audioDestinationRef.current) {
+    // Add initial checks with better diagnostics
+    const missingRefs = {
+      audioContext: !audioContextRef.current,
+      karaokeVideo: !karaokeVideoRef.current,
+      webcamVideo: !webcamVideoRef.current,
+      mediaRecorder: !mediaRecorderRef.current,
+      audioDestination: !audioDestinationRef.current,
+      canvas: !canvasRef.current
+    };
+    
+    if (Object.values(missingRefs).some(val => val)) {
+      console.error("Recording start failed: missing required refs", missingRefs);
+      alert("L'enregistrement n'est pas prêt. Veuillez réactualiser la page et réessayer.");
       return;
     }
     
@@ -664,6 +696,13 @@ function LiveKaraokeRecorderInner({
       // Démarrer la lecture avec gestion d'erreur
       try {
         console.log("Starting video playback...");
+        
+        // Add defensive null check
+        if (!karaokeVideoRef.current) {
+          console.warn("Karaoke video ref is null, cannot start playback");
+          throw new Error("Karaoke video element not available");
+        }
+        
         const playPromise = karaokeVideoRef.current.play();
         
         // Gérer la promesse de lecture de manière robuste
@@ -673,10 +712,13 @@ function LiveKaraokeRecorderInner({
             console.log("Karaoke video playing successfully");
           } catch (e) {
             console.warn("Première tentative de lecture vidéo échouée, nouvelle tentative...", e);
-            await karaokeVideoRef.current!.play().catch(() => {
-              console.warn("Second attempt also failed, continuing anyway");
-              // Continue anyway, the audio might still work
-            });
+            // Add null check before retry
+            if (karaokeVideoRef.current) {
+              await karaokeVideoRef.current.play().catch(() => {
+                console.warn("Second attempt also failed, continuing anyway");
+                // Continue anyway, the audio might still work
+              });
+            }
           }
         }
         
@@ -684,9 +726,13 @@ function LiveKaraokeRecorderInner({
         await new Promise(resolve => setTimeout(resolve, 100));
         
         console.log("Starting audio playback...");
-        await mediaElement.play().catch(() => {
-          console.warn("Audio playback failed, continuing anyway");
-        });
+        if (mediaElement && typeof mediaElement.play === 'function') {
+          await mediaElement.play().catch(() => {
+            console.warn("Audio playback failed, continuing anyway");
+          });
+        } else {
+          console.warn("MediaElement not available or play method missing");
+        }
         
       } catch (playError) {
         console.error("Erreur lors de la lecture:", playError);
