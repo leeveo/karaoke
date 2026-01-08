@@ -46,6 +46,7 @@ function LiveKaraokeRecorderInner({
   const playingRef = useRef<boolean>(false);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const cameraKitContainerRef = useRef<HTMLDivElement>(null);
+  const setupInProgressRef = useRef<boolean>(false);
   
   // Navigation
   const router = useRouter();
@@ -199,6 +200,13 @@ function LiveKaraokeRecorderInner({
 
     const setup = async () => {
       try {
+        // Prevent multiple simultaneous setup attempts
+        if (setupInProgressRef.current) {
+          console.log("Setup already in progress, skipping duplicate call");
+          return;
+        }
+        setupInProgressRef.current = true;
+        
         // 1. Configurer la vidéo karaoké
         if (karaokeVideoRef.current) {
           karaokeVideoRef.current.crossOrigin = "anonymous";
@@ -437,6 +445,7 @@ function LiveKaraokeRecorderInner({
         
       } catch (err) {
         console.error("Erreur lors de l'initialisation:", err);
+        setupInProgressRef.current = false;
       }
     };
 
@@ -444,6 +453,8 @@ function LiveKaraokeRecorderInner({
 
     // Nettoyage
     return () => {
+      setupInProgressRef.current = false;
+      
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
@@ -471,7 +482,7 @@ function LiveKaraokeRecorderInner({
         audioContext.close().catch(() => {});
       }
     };
-  }, [karaokeSrc, router, songId, eventId, recordingStarted, webcamReady, setWebcamElement, session, logoLoaded]);
+  }, [karaokeSrc, logoLoaded]);
 
   // Charger directement un logo par défaut lors du premier render
   useEffect(() => {
