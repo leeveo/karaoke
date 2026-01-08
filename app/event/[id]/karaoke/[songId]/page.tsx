@@ -293,25 +293,20 @@ export default function EventKaraokePage() {
       <div className="relative z-10 w-full h-screen flex items-center justify-center px-2 py-2">
         {videoReady ? (
           <div className="relative flex justify-center w-full h-full max-h-screen">
-            {/* Bordure néon */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-gray-300 to-gray-100 rounded-2xl blur opacity-75 transition duration-1000"></div>
             
-            {/* Conteneur vidéo - padding retiré pour coller la bordure */}
-            <div className="relative bg-black/60 rounded-2xl shadow-2xl border border-white/10 w-full h-full flex items-center justify-center overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-2xl pointer-events-none"></div>
-              
-              <div className="w-full h-full flex justify-center items-center">
-                <LiveKaraokeRecorder 
-                  karaokeSrc={videoUrl} 
-                  eventId={id as string} 
-                  buttonStyles={{
-                    className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
-                    icon: "🎵",
-                    text: "" // Removed the text here
-                  }}
-                />
+            <div className="w-full h-full flex justify-center items-center">
+                <div className="border-4 border-gray-400 rounded-lg shadow-lg overflow-hidden m-8">
+                  <LiveKaraokeRecorder 
+                    karaokeSrc={videoUrl} 
+                    eventId={id as string} 
+                    buttonStyles={{
+                      className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
+                      icon: "🎵",
+                      text: "" // Removed the text here
+                    }}
+                  />
+                </div>
               </div>
-            </div>
           </div>
         ) : (
           <div className="bg-black/60 p-8 rounded-2xl text-white text-center shadow-2xl border border-white/10">

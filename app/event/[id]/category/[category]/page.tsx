@@ -573,6 +573,14 @@ export default function EventCategoryPage() {
                               }}
                             />
                           )}
+                          {/* Primary Color Overlay with Opacity */}
+                          <div 
+                            className="absolute inset-0"
+                            style={{
+                              backgroundColor: 'var(--primary-color-75)',
+                              mixBlendMode: 'multiply'
+                            }} 
+                          />
                           {/* Gradient Overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                         </div>

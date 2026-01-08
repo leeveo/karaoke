@@ -122,32 +122,57 @@ export async function createEvent(eventData: EventInput): Promise<string | null>
 // Mettre à jour un événement
 export async function updateEvent(id: string, eventData: EventInput): Promise<boolean> {
   try {
-    console.log("Updating event with data:", JSON.stringify(eventData, null, 2));
+    console.log("updateEvent: Starting with ID:", id);
+    console.log("updateEvent: Data to update:", JSON.stringify(eventData, null, 2));
+    
+    // First verify the event exists
+    const { data: eventExists, error: checkError } = await supabase
+      .from('events')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (checkError) {
+      console.error("updateEvent: Event not found:", checkError);
+      throw new Error("Événement non trouvé");
+    }
+
+    console.log("updateEvent: Event exists, proceeding with update");
     
     // Update the event record
-    const { error: eventError } = await supabase
+    const { data: eventUpdateResult, error: eventError } = await supabase
       .from('events')
       .update({
         name: eventData.name,
         date: eventData.date
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
+    console.log("updateEvent: Event update result:", eventUpdateResult);
+    
     if (eventError) {
-      console.error("Error updating event:", eventError);
+      console.error("updateEvent: Error updating event:", eventError);
       throw eventError;
     }
 
+    if (!eventUpdateResult || eventUpdateResult.length === 0) {
+      console.error("updateEvent: Event update returned no results");
+      throw new Error("Impossible de mettre à jour l'événement");
+    }
+
     // Check if customization exists for this event
-    const { data: existingCustomization, error: checkError } = await supabase
+    const { data: existingCustomization, error: checkCustomError } = await supabase
       .from('event_customizations')
       .select('*')
       .eq('event_id', id)
       .single();
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error("Error checking for existing customization:", checkError);
-      throw checkError;
+    console.log("updateEvent: Existing customization:", existingCustomization);
+    
+    if (checkCustomError && checkCustomError.code !== 'PGRST116') {
+      console.error("updateEvent: Error checking customization:", checkCustomError);
+      // Continue anyway, we'll try to insert
     }
 
     const customizationData = {
@@ -158,36 +183,25 @@ export async function updateEvent(id: string, eventData: EventInput): Promise<bo
       logo: eventData.customization.logo || null,
     };
     
-    console.log("Customization data to save:", JSON.stringify(customizationData, null, 2));
+    console.log("updateEvent: Customization data to save:", JSON.stringify(customizationData, null, 2));
 
-    // Insert or update customization
-    if (!existingCustomization) {
-      // Insert new customization
-      const { error: insertError } = await supabase
-        .from('event_customizations')
-        .insert(customizationData);
+    // Use upsert for reliability
+    const { data: customResult, error: customError } = await supabase
+      .from('event_customizations')
+      .upsert(customizationData, { onConflict: 'event_id' })
+      .select();
 
-      if (insertError) {
-        console.error("Error inserting customization:", insertError);
-        throw insertError;
-      }
-    } else {
-      // Update existing customization
-      const { error: updateError } = await supabase
-        .from('event_customizations')
-        .update(customizationData)
-        .eq('event_id', id);
-
-      if (updateError) {
-        console.error("Error updating customization:", updateError);
-        throw updateError;
-      }
+    console.log("updateEvent: Customization upsert result:", customResult);
+    
+    if (customError) {
+      console.error("updateEvent: Error upserting customization:", customError);
+      throw customError;
     }
 
-    console.log("Event and customization updated successfully");
+    console.log("updateEvent: Event and customization updated successfully");
     return true;
   } catch (error) {
-    console.error('Error updating event:', error);
+    console.error('updateEvent: Error:', error);
     return false;
   }
 }

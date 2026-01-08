@@ -38,8 +38,20 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
         } hidden md:block relative h-screen bg-gradient-to-b from-blue-900 to-blue-700 text-white transition-all duration-300 ease-in-out z-20`}
       >
         <div className="flex items-center justify-between h-16 px-4">
-          <div className={`${!isOpen && 'opacity-0'} transition-opacity duration-200`}>
-            <span className="text-xl font-bold">KaraokeAdmin</span>
+          <div className={`${!isOpen && 'opacity-0'} transition-opacity duration-200 flex items-center gap-2`}>
+            <div className="relative flex items-center">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="14" fill="url(#gradient)" />
+                <path d="M10 12h12M10 16h12M10 20h8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
+                    <stop offset="0%" stopColor="#3B82F6" />
+                    <stop offset="100%" stopColor="#8B5CF6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-transparent">Leerycs</span>
           </div>
           <button 
             onClick={() => setIsOpen(!isOpen)}
@@ -89,7 +101,19 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between h-16 px-4">
-            <span className="text-xl font-bold text-white">KaraokeAdmin</span>
+            <div className="flex items-center gap-2">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="14" fill="url(#gradient-mobile)" />
+                <path d="M10 12h12M10 16h12M10 20h8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="gradient-mobile" x1="0" y1="0" x2="32" y2="32">
+                    <stop offset="0%" stopColor="#3B82F6" />
+                    <stop offset="100%" stopColor="#8B5CF6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-transparent">Leerycs</span>
+            </div>
             <button 
               onClick={() => setIsOpen(false)}
               className="p-1 rounded-full hover:bg-blue-800 focus:outline-none text-white"

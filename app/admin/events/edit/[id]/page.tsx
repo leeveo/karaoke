@@ -30,10 +30,17 @@ export default function EditEventPage() {
 
   const handleSubmit = async (eventData: EventInput) => {
     try {
-      await updateEvent(id, eventData);
-      router.push('/admin/events');
+      console.log("EditEventPage: Submitting data:", JSON.stringify(eventData, null, 2));
+      const success = await updateEvent(id, eventData);
+      if (success) {
+        alert('Événement modifié avec succès');
+        router.push('/admin/events');
+      } else {
+        alert('Erreur lors de la modification de l\'événement');
+      }
     } catch (error) {
       console.error('Failed to update event:', error);
+      alert('Erreur lors de la modification de l\'événement: ' + (error as Error).message);
     }
   };
 
@@ -63,10 +70,10 @@ export default function EditEventPage() {
           name: event.name,
           date: event.date,
           customization: event.customization || {
-            primary_color: '#8b5cf6',
-            secondary_color: '#ec4899',
-            background_image: null,
-            logo: null
+            primary_color: event.customization?.primary_color || '#8b5cf6',
+            secondary_color: event.customization?.secondary_color || '#ec4899',
+            background_image: event.customization?.background_image || null,
+            logo: event.customization?.logo || null
           }
         }} 
       />

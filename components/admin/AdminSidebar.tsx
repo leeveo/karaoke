@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { 
   FiGrid, 
   FiCalendar, 
@@ -33,10 +32,19 @@ export default function AdminSidebar({ activeTab, isOpen, onClose }: AdminSideba
     >
       <div className="p-6">
         <div className="flex items-center justify-center mb-8">
-          <Link href="/admin/dashboard" className="flex items-center">
-            <Image src="/logo.png" alt="Karaoke SaaS Logo" width={40} height={40} className="h-10 mr-3" />
+          <Link href="/admin/dashboard" className="flex items-center gap-3">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="18" fill="url(#gradient-sidebar)" />
+              <path d="M12 15h16M12 20h16M12 25h10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+              <defs>
+                <linearGradient id="gradient-sidebar" x1="0" y1="0" x2="40" y2="40">
+                  <stop offset="0%" stopColor="#3B82F6" />
+                  <stop offset="100%" stopColor="#8B5CF6" />
+                </linearGradient>
+              </defs>
+            </svg>
             <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-500 to-indigo-400">
-              KaraokeSaaS
+              Leerycs
             </span>
           </Link>
         </div>
@@ -70,10 +78,10 @@ export default function AdminSidebar({ activeTab, isOpen, onClose }: AdminSideba
             <p className="font-medium text-blue-600">Aide & Support</p>
             <p className="mt-1 text-xs">Besoin d&apos;aide . Contactez-nous par email.</p>
             <a 
-              href="mailto:support@karaoke.example.com" 
+              href="mailto:support@leerycs.com" 
               className="mt-2 text-xs text-blue-600 hover:text-blue-800 block"
             >
-              support@karaoke.example.com
+              support@leerycs.com
             </a>
           </div>
         </div>

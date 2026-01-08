@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   FiMenu, 
@@ -11,6 +11,7 @@ import {
   FiUser,
   FiSettings
 } from 'react-icons/fi';
+import { getCurrentUser } from '@/lib/supabase/auth';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -18,6 +19,17 @@ interface HeaderProps {
 
 export default function AdminHeader({ toggleSidebar }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('Administrateur');
+  
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
+    loadUser();
+  }, []);
   
   return (
     <header className="bg-white shadow-sm z-10">
@@ -68,10 +80,10 @@ export default function AdminHeader({ toggleSidebar }: HeaderProps) {
                   className="flex items-center max-w-xs rounded-full focus:outline-none"
                 >
                   <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                    A
+                    <FiUser className="h-4 w-4" />
                   </div>
-                  <span className="ml-3 text-sm font-medium text-gray-700 hidden md:block">
-                    Administrateur
+                  <span className="ml-3 text-sm font-medium text-gray-700 hidden md:block" title={userEmail}>
+                    {userEmail.length > 20 ? userEmail.substring(0, 20) + '...' : userEmail}
                   </span>
                   <FiChevronDown className="ml-1 h-4 w-4 text-gray-500 hidden md:block" />
                 </button>
@@ -79,6 +91,9 @@ export default function AdminHeader({ toggleSidebar }: HeaderProps) {
               
               {userMenuOpen && (
                 <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
+                  <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+                    {userEmail}
+                  </div>
                   <Link 
                     href="/admin/profile" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"

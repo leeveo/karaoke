@@ -128,9 +128,14 @@ export async function GET(request: NextRequest) {
                 LastModified: item.LastModified,
                 Size: item.Size
               };
-            } else if (fileName.match(/\.(png|jpg|jpeg)$/i)) {
-              // Construire l'URL de l'image
-              fileData.image = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'eu-west-3'}.amazonaws.com/${item.Key}`;
+            } else if (fileName.match(/\.(jpg|jpeg|png)$/i)) {
+              // Construire l'URL de l'image - donner la priorité aux JPG
+              const imageUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'eu-west-3'}.amazonaws.com/${item.Key}`;
+              
+              // Ne remplacer l'image que si c'est un JPG/JPEG ou si on n'a pas encore d'image
+              if (fileName.match(/\.(jpg|jpeg)$/i) || !fileData.image) {
+                fileData.image = imageUrl;
+              }
             }
           }
         }

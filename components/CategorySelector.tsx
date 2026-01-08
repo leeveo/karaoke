@@ -231,7 +231,7 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full mx-auto flex flex-col items-center justify-center"
+      className="w-screen -mx-[calc((100vw-100%)/2)]"
     >
       <Swiper
         effect={'coverflow'}
@@ -254,15 +254,13 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
         navigation={true}
         pagination={false}
         modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
-        className="w-full h-full"
+        className="w-full"
         breakpoints={{
           320: { slidesPerView: 1.5, spaceBetween: 15 },
           768: { slidesPerView: 2.5, spaceBetween: 18 },
           1024: { slidesPerView: 3.5, spaceBetween: 20 },
         }}
         style={{
-          width: '100%',
-          height: '100%',
           paddingTop: '50px',
           paddingBottom: '80px',
         }}

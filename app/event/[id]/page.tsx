@@ -191,33 +191,43 @@ export default function EventPage() {
       {/* Overlay for readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/60 backdrop-blur-sm"></div>
       
-      <div className="relative z-10 container mx-auto px-4 py-8 flex flex-col items-center w-full">
+      <div className="relative z-10 container mx-auto px-4 py-8 flex flex-col items-center w-full gap-8">
         {/* Event header with logo */}
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8 w-full">
-          <h1 className="text-4xl font-bold text-white mb-4 md:mb-0"
-            style={{ WebkitTextStroke: "1px rgba(0,0,0,0.3)" }}
-          >
-            {event.name}
-          </h1>
-          
-          {/* Display the logo if available */}
-          {event.customization?.logoUrl && (
-            <div className="w-64 h-64 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
-              <Image 
-                src={event.customization.logoUrl} 
-                alt={`${event.name} Logo`} 
-                width={200}
-                height={200}
-                className="max-w-full max-h-full object-contain"
-              />
-            </div>
-          )}
-        </div>
+        <h1 className="text-4xl font-bold text-white text-center"
+          style={{ WebkitTextStroke: "1px rgba(0,0,0,0.3)" }}
+        >
+          {event.name}
+        </h1>
         
-        {/* Catégories */}
-        <div className="w-full">
-          <CategorySelector eventId={id} />
+        {/* Display the logo if available */}
+        {event.customization?.logoUrl && (
+          <div className="w-64 h-64 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
+            <Image 
+              src={event.customization.logoUrl} 
+              alt={`${event.name} Logo`} 
+              width={200}
+              height={200}
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
+        )}
+      </div>
+      
+      {/* Catégories - Full width */}
+      <div className="relative z-10 w-full flex justify-center">
+        <div className="w-full px-4 py-2">
+          <h2 className="text-3xl font-bold text-white text-center mb-2"
+            style={{ 
+              color: 'var(--primary-color)',
+              WebkitTextStroke: "1px rgba(0,0,0,0.3)" 
+            }}
+          >
+            Choisissez votre catégorie
+          </h2>
         </div>
+      </div>
+      <div className="relative z-10 w-full">
+        <CategorySelector eventId={id} />
       </div>
     </div>
   );

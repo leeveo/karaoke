@@ -4,7 +4,7 @@ import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useEffect, useState } from 'react';
 import { fetchEventById } from '@/lib/supabase/events';
-import { Event } from '@/types/event';
+import { Event as EventType } from '@/types/event';
 import { supabase } from '@/lib/supabase/client';
 
 export default function EventQRPage() {
@@ -12,7 +12,7 @@ export default function EventQRPage() {
   const { id, sessionId } = useParams();
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventType | null>(null);
   const router = useRouter();
   
   // Charger l'événement et ses personnalisations
@@ -182,6 +182,39 @@ export default function EventQRPage() {
   const [formError, setFormError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [countdown, setCountdown] = useState(45);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+
+  // Forcer l'affichage du clavier virtuel quand le formulaire s'ouvre
+  useEffect(() => {
+    if (showForm) {
+      // Attendre que le DOM soit mis à jour et rendu
+      const timer = setTimeout(() => {
+        const nameInput = document.getElementById('name') as HTMLInputElement;
+        if (nameInput) {
+          // Assurez-vous que l'input est visible
+          nameInput.scrollIntoView({ behavior: 'auto', block: 'center' });
+          
+          // Force le focus multiple fois pour s'assurer que le clavier apparaît
+          nameInput.focus();
+          nameInput.focus();
+          
+          // Sélectionner le texte (attire l'attention du système)
+          nameInput.select();
+          
+          // Simuler des événements utilisateur
+          nameInput.dispatchEvent(new Event('focus', { bubbles: true }));
+          nameInput.dispatchEvent(new Event('click', { bubbles: true }));
+          
+          // Pour iOS, essayer de déclencher le clavier une autre fois
+          setTimeout(() => {
+            nameInput.focus();
+          }, 200);
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [showForm]);
 
   useEffect(() => {
     // Rediriger si l'URL n'est pas définie
@@ -307,8 +340,14 @@ export default function EventQRPage() {
       // Copier le lien dans le presse-papiers
       await navigator.clipboard.writeText(pageUrl as string);
       
-      // Afficher un message de succès
-      alert('Email envoyé avec succès et lien copié dans le presse-papiers!');
+      // Afficher le pop-up de succès
+      setSuccessMessage('Email envoyé avec succès et lien copié!');
+      setShowSuccessPopup(true);
+      
+      // Fermer automatiquement le pop-up après 3 secondes
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+      }, 3000);
       
       // Fermer le formulaire
       setShowForm(false);
@@ -468,17 +507,17 @@ export default function EventQRPage() {
       {/* Popup de formulaire */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md animate-fade-in overflow-y-auto max-h-[90vh]">
-            <div className="p-6">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl animate-fade-in overflow-y-auto max-h-[90vh]">
+            <div className="p-8">
               <h2 
-                className="text-2xl font-bold mb-4 text-center"
+                className="text-3xl font-bold mb-6 text-center"
                 style={{ color: 'var(--primary-color)' }}
               >
                 Partagez votre performance
               </h2>
 
               {formError && (
-                <div className="p-3 rounded mb-4"
+                <div className="p-4 rounded mb-6"
                   style={{ 
                     backgroundColor: 'rgba(239, 68, 68, 0.1)', 
                     borderLeft: '3px solid var(--secondary-color)',
@@ -489,9 +528,9 @@ export default function EventQRPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="name" className="block text-lg font-medium text-gray-700 mb-2">
                     Votre nom
                   </label>
                   <input
@@ -500,16 +539,18 @@ export default function EventQRPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+                    autoFocus
+                    inputMode="text"
+                    className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)'
+                      borderColor: formData.name ? 'var(--primary-color)' : 'rgba(139, 92, 246, 0.3)',
                     }}
                     placeholder="Entrez votre nom"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="email" className="block text-lg font-medium text-gray-700 mb-2">
                     Votre email
                   </label>
                   <input
@@ -518,37 +559,38 @@ export default function EventQRPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+                    inputMode="email"
+                    className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)'
+                      borderColor: formData.email ? 'var(--primary-color)' : 'rgba(139, 92, 246, 0.3)',
                     }}
                     placeholder="votre@email.com"
                   />
                 </div>
 
                 <div className="flex items-start">
-                  <div className="flex items-center h-5">
+                  <div className="flex items-center h-6">
                     <input
                       id="rgpdConsent"
                       name="rgpdConsent"
                       type="checkbox"
                       checked={formData.rgpdConsent}
                       onChange={handleChange}
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-5 w-5 rounded border-gray-300"
                       style={{ color: 'var(--primary-color)' }}
                     />
                   </div>
                   <div className="ml-3 text-sm">
-                    <label htmlFor="rgpdConsent" className="font-medium text-gray-700">
+                    <label htmlFor="rgpdConsent" className="font-medium text-gray-700 text-base">
                      Accepter les conditions RGPD
                     </label>
-                    <p className="text-gray-500 text-xs mt-1">
+                    <p className="text-gray-500 text-sm mt-1">
                       En cochant cette case, vous acceptez que nous utilisions vos données personnelles pour vous contacter à propos de votre performance karaoké. Vos données ne seront pas partagées avec des tiers.
                     </p>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-md text-sm"
+                <div className="p-4 rounded-md text-base"
                   style={{ 
                     backgroundColor: 'rgba(139, 92, 246, 0.1)',
                     color: 'var(--primary-dark)'
@@ -557,11 +599,11 @@ export default function EventQRPage() {
                   <p>Un email contenant votre vidéo karaoké {event ? `de l&apos;événement "${event.name}"` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
                 </div>
 
-                <div className="flex flex-col gap-3 mt-6">
+                <div className="flex flex-col gap-4 mt-8">
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="text-white px-6 py-3 rounded-lg transition-all duration-300 flex justify-center w-full"
+                    className="text-white px-8 py-4 rounded-lg transition-all duration-300 flex justify-center w-full font-bold text-xl"
                     style={{ 
                       background: isSubmitting 
                         ? 'var(--primary-gradient)' 
@@ -572,7 +614,7 @@ export default function EventQRPage() {
                   >
                     {isSubmitting ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-2 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -584,7 +626,7 @@ export default function EventQRPage() {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="border px-6 py-3 rounded-lg transition-all duration-300 w-full"
+                    className="border px-8 py-4 rounded-lg transition-all duration-300 w-full font-bold text-lg"
                     style={{ 
                       borderColor: 'var(--primary-color)', 
                       color: 'var(--primary-color)' 
@@ -594,6 +636,19 @@ export default function EventQRPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Pop-up de succès */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-auto animate-bounce">
+            <div className="text-center">
+              <div className="text-5xl mb-4">✅</div>
+              <h3 className="text-2xl font-bold text-green-600 mb-2">Succès!</h3>
+              <p className="text-gray-700">{successMessage}</p>
             </div>
           </div>
         </div>

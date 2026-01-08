@@ -476,7 +476,7 @@ function LiveKaraokeRecorderInner({
         audioContextRef.current.close().catch(() => {});
       }
     };
-  }, [karaokeSrc, router, songId, useSnapFilters, setWebcamElement, session]);
+  }, [karaokeSrc, router, songId, useSnapFilters, setWebcamElement, session, logoLoaded]);
 
   // Charger directement un logo par défaut lors du premier render
   useEffect(() => {
@@ -776,9 +776,9 @@ function LiveKaraokeRecorderInner({
   };
 
   // Styles du bouton
-  const defaultButtonClassName = "mt-4 text-white font-bold py-8 px-16 rounded-2xl transition-all duration-300 transform shadow-2xl border-2 border-white/30 text-3xl";
+  const defaultButtonClassName = "mt-4 text-white font-bold py-16 px-32 rounded-4xl transition-all duration-300 transform shadow-2xl border-2 border-white/30 text-5xl leading-tight";
   const buttonClassName = buttonStyles?.className || defaultButtonClassName;
-  const buttonText = buttonStyles?.text || "Cliquez ici pour lancer le karaoké";
+  const buttonText = buttonStyles?.text || "Cliquez ici pour\nlancer le karaoké";
   const buttonIcon = buttonStyles?.icon || "";
 
   return (
@@ -805,21 +805,6 @@ function LiveKaraokeRecorderInner({
         <div ref={cameraKitContainerRef}></div>
       </div>
       
-      {/* Supprimer la section du sélecteur de filtres Snapchat et ne garder que le bouton d'activation/désactivation */}
-      {isInitialized && (
-        <div className="mb-4 flex justify-center items-center w-full z-20">
-          <button
-            onClick={() => setUseSnapFilters(!useSnapFilters)}
-            className="text-white px-4 py-2 rounded-xl"
-            style={{ 
-              background: useSnapFilters ? 'var(--secondary-gradient)' : 'rgba(255,255,255,0.1)',
-              boxShadow: useSnapFilters ? '0 4px 10px rgba(0,0,0,0.2)' : 'none'
-            }}
-          >
-            {useSnapFilters ? 'Filtres activés ✓' : 'Filtres désactivés'}
-          </button>
-        </div>
-      )}
       
       {/* Canvas principal */}
       <div className="w-full h-full flex justify-center relative">
@@ -845,14 +830,14 @@ function LiveKaraokeRecorderInner({
               }
               style={
                 webcamReady && karaokeReady && !playingRef.current
-                  ? { background: 'var(--secondary-gradient)' }
+                  ? { background: 'var(--secondary-gradient)', backgroundOpacity: 0.9 }
                   : {}
               }
             >
-              <span className="flex items-center justify-center gap-2">
+              <span className="flex flex-col items-center justify-center gap-2">
                 {buttonIcon && <span className="mr-1">{buttonIcon}</span>}
                 <span className={webcamReady && karaokeReady && !playingRef.current ? "w-3 h-3 rounded-full bg-white animate-pulse" : "hidden"}></span>
-                {buttonText && <span>{buttonText}</span>}
+                {buttonText && <span className="whitespace-pre-line">{buttonText}</span>}
               </span>
             </button>
           </div>
@@ -867,16 +852,6 @@ function LiveKaraokeRecorderInner({
       </div>
       
       {/* Affichage du statut */}
-      <div 
-        className="mt-2 text-white p-2 rounded text-center w-full max-w-4xl mx-auto backdrop-blur-sm"
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          borderLeft: '3px solid var(--primary-color)',
-          borderRight: '3px solid var(--secondary-color)'
-        }}
-      >
-        {status}
-      </div>
       
       {/* Bouton "Arrêter l'enregistrement" */}
       {recordingStarted && !isProcessing && (
@@ -891,26 +866,6 @@ function LiveKaraokeRecorderInner({
             </svg>
             <span>Arrêter l&apos;enregistrement</span>
           </button>
-        </div>
-      )}
-      
-      {/* Indicateurs d'état */}
-      {!isProcessing && (
-        <div className="mt-4 text-sm flex flex-col items-center w-full max-w-4xl mx-auto">
-          <div className="flex space-x-4 justify-center">
-            <span className="px-3 py-1 rounded-full" style={{ 
-              backgroundColor: webcamReady ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.1)',
-              color: webcamReady ? 'white' : 'var(--text-muted)'
-            }}>
-              Webcam: {webcamReady ? "✅" : "❌"}
-            </span>
-            <span className="px-3 py-1 rounded-full" style={{ 
-              backgroundColor: karaokeReady ? 'var(--secondary-color)' : 'rgba(255, 255, 255, 0.1)',
-              color: karaokeReady ? 'white' : 'var(--text-muted)'
-            }}>
-              Vidéo: {karaokeReady ? "✅" : "❌"}
-            </span>
-          </div>
         </div>
       )}
     </div>

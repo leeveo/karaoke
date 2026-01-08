@@ -35,6 +35,23 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
+  // Mettre à jour formValues quand initialData change
+  useEffect(() => {
+    if (initialData) {
+      // Nettoyer la date pour qu'elle soit au format yyyy-MM-dd
+      let cleanDate = initialData.date;
+      if (cleanDate && cleanDate.includes('T')) {
+        // Si la date contient un T (ISO format), la convertir en yyyy-MM-dd
+        cleanDate = cleanDate.split('T')[0];
+      }
+      
+      setFormValues({
+        ...initialData,
+        date: cleanDate
+      });
+    }
+  }, [initialData]);
+
   // Load templates on component mount
   useEffect(() => {
     async function loadTemplates() {
@@ -226,19 +243,21 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     }
     
     // Log the data being submitted
-    console.log("Submitting form values:", JSON.stringify(formValues, null, 2));
+    console.log("EventForm handleSubmit: formValues=", JSON.stringify(formValues, null, 2));
     
     // Make sure all fields are present in the customization object
     const dataToSubmit = {
-      ...formValues,
+      name: formValues.name,
+      date: formValues.date,
       customization: {
-        primary_color: formValues.customization.primary_color,
-        secondary_color: formValues.customization.secondary_color,
-        background_image: formValues.customization.background_image || null,
-        logo: formValues.customization.logo || null
+        primary_color: formValues.customization?.primary_color || '#0334b9',
+        secondary_color: formValues.customization?.secondary_color || '#2fb9db',
+        background_image: formValues.customization?.background_image || null,
+        logo: formValues.customization?.logo || null
       }
     };
     
+    console.log("EventForm handleSubmit: dataToSubmit=", JSON.stringify(dataToSubmit, null, 2));
     onSubmit(dataToSubmit);
   };
 
@@ -449,7 +468,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
           type="submit"
           className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
         >
-          Créer un événement
+          {initialData ? 'Modifier l\'événement' : 'Créer un événement'}
         </button>
       </div>
     </form>
