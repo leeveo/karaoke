@@ -1,11 +1,9 @@
 'use client';
 
-import { FFmpegProvider } from '@/components/FFmpegProvider';
-
 export default function KaraokePage() {
   return (
-    <FFmpegProvider>
+    <div>
       {/* Ton composant vidéo + boutons d'enregistrement */}
-    </FFmpegProvider>
+    </div>
   );
 }

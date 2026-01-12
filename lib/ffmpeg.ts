@@ -1,18 +1,22 @@
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
 
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = new FFmpeg();
 
 export async function mergeAudioVideo(audioBlob: Blob, videoBlob: Blob): Promise<Blob> {
-  if (!ffmpeg.isLoaded()) {
+  if (!ffmpeg.loaded) {
     await ffmpeg.load();
   }
 
-  ffmpeg.FS('writeFile', 'audio.webm', await fetchFile(audioBlob));
-  ffmpeg.FS('writeFile', 'video.webm', await fetchFile(videoBlob));
+  // Write files using the new API
+  const audioData = await audioBlob.arrayBuffer();
+  const videoData = await videoBlob.arrayBuffer();
+  
+  ffmpeg.writeFile('audio.webm', new Uint8Array(audioData));
+  ffmpeg.writeFile('video.webm', new Uint8Array(videoData));
 
-  await ffmpeg.run('-i', 'video.webm', '-i', 'audio.webm', '-c:v', 'copy', '-c:a', 'aac', '-shortest', 'output.webm');
+  await ffmpeg.exec(['-i', 'video.webm', '-i', 'audio.webm', '-c:v', 'copy', '-c:a', 'aac', '-shortest', 'output.webm']);
 
-  const data = ffmpeg.FS('readFile', 'output.webm');
+  const data = await ffmpeg.readFile('output.webm') as Uint8Array;
 
-  return new Blob([data.buffer], { type: 'video/webm' });
+  return new Blob([data.buffer as ArrayBuffer], { type: 'video/webm' });
 }
