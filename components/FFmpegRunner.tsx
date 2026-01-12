@@ -2,12 +2,18 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface FFmpegRunnerProps {
   webcamUrl: string;
   karaokeUrl: string;
   onDone: (videoUrl: string) => void;
+}
+
+// Helper function to convert URL to blob URL
+async function toBlobURL(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
 }
 
 export default function FFmpegRunner({ webcamUrl, karaokeUrl, onDone }: FFmpegRunnerProps) {
@@ -20,23 +26,26 @@ export default function FFmpegRunner({ webcamUrl, karaokeUrl, onDone }: FFmpegRu
       const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
 
       await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`),
       });
 
       // Charger les fichiers webcam (enregistré) et karaoke.mp4
       const webcamBlob = await fetch(webcamUrl).then(r => r.blob());
       const karaokeBlob = await fetch(karaokeUrl).then(r => r.blob());
 
-      await ffmpeg.writeFile('webcam.webm', await fetchFile(webcamBlob));
-      await ffmpeg.writeFile('karaoke.mp4', await fetchFile(karaokeBlob));
+      const webcamData = new Uint8Array(await webcamBlob.arrayBuffer());
+      const karaokeData = new Uint8Array(await karaokeBlob.arrayBuffer());
+
+      await ffmpeg.writeFile('webcam.webm', webcamData);
+      await ffmpeg.writeFile('karaoke.mp4', karaokeData);
       
-      const webcamData = await ffmpeg.readFile('webcam.webm');
-      console.log('Webcam recorded size:', webcamData.length);
+      const webcamReadData = await ffmpeg.readFile('webcam.webm');
+      console.log('Webcam recorded size:', webcamReadData.length);
       
 
-      const karaokeData = await ffmpeg.readFile('karaoke.mp4');
-console.log('Karaoke loaded size:', karaokeData.length);
+      const karaokeReadData = await ffmpeg.readFile('karaoke.mp4');
+      console.log('Karaoke loaded size:', karaokeReadData.length);
 
       // Extraire l'audio du karaoké
 await ffmpeg.exec([
