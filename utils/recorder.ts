@@ -6,7 +6,8 @@ let recordedChunks: Blob[] = [];
  */
 export function startRecording(webcam: HTMLVideoElement, lyrics: HTMLVideoElement) {
   const webcamStream = webcam.srcObject as MediaStream;
-  const lyricsStream = lyrics.captureStream();
+  // captureStream is available on HTMLVideoElement but not in TypeScript types
+  const lyricsStream = (lyrics as HTMLVideoElement & { captureStream(): MediaStream }).captureStream();
 
   const combinedTracks = [
     ...webcamStream.getVideoTracks(),

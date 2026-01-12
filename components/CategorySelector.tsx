@@ -4,6 +4,13 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { getCategories } from '../services/s3Service';
 import { motion } from 'framer-motion';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { EffectCoverflow, Autoplay, Navigation, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/effect-coverflow';
+import 'swiper/css/pagination';
+import 'swiper/css/navigation';
+import './category-swiper.css';
 
 // Modern SVG icons for categories
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -98,6 +105,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 // Get icon for a category (with fallback)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getCategoryIcon = (category: string): React.ReactNode => {
   return categoryIcons[category.toLowerCase()] || (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12">
@@ -223,69 +231,123 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center"
+      className="w-screen -mx-[calc((100vw-100%)/2)]"
     >
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
+      <Swiper
+        effect={'coverflow'}
+        grabCursor={true}
+        centeredSlides={true}
+        slidesPerView={3.5}
+        spaceBetween={20}
+        loop={true}
+        autoplay={{
+          delay: 3500,
+          disableOnInteraction: false,
+        }}
+        coverflowEffect={{
+          rotate: 5,
+          stretch: 0,
+          depth: 100,
+          modifier: 1,
+          slideShadows: false,
+        }}
+        navigation={true}
+        pagination={false}
+        modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
+        className="w-full"
+        breakpoints={{
+          320: { slidesPerView: 1.5, spaceBetween: 15 },
+          768: { slidesPerView: 2.5, spaceBetween: 18 },
+          1024: { slidesPerView: 3.5, spaceBetween: 20 },
+        }}
+        style={{
+          paddingTop: '50px',
+          paddingBottom: '80px',
+        }}
+      >
         {categories.map((cat, index) => (
-          <motion.div
-            key={`${cat}-${index}`} // Add index to ensure uniqueness
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.05, y: -5 }}
-            className="relative"
-          >
-            <button
+          <SwiperSlide key={`${cat}-${index}`}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ scale: 1.02, y: -10 }}
+              className="cursor-pointer h-full w-full flex items-center justify-center"
               onClick={() => handleSelect(cat)}
-              className={`
-                w-full h-40 rounded-2xl overflow-hidden relative group 
-                ${selectedCategory === cat ? 'ring-4 ring-white' : ''}
-              `}
-              disabled={selectedCategory !== null}
             >
-              {/* Use CSS variables for gradients - important for theme switching */}
               <div 
-                className="absolute inset-0 opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                style={{
-                  background: index % 2 === 0 
-                    ? 'var(--primary-gradient)'
-                    : 'var(--secondary-gradient)'
+                className={`
+                  relative w-full rounded-3xl overflow-hidden group
+                  ${selectedCategory === cat ? 'ring-4 ring-white' : ''}
+                `}
+                style={{ 
+                  height: '400px',
+                  border: '3px solid white',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 255, 255, 0.2)'
                 }}
-              ></div>
-              
-              {/* Animated pattern overlay */}
-              <div className="absolute inset-0 bg-[url('/pattern.png')] bg-repeat opacity-10 group-hover:opacity-20 transition-opacity"></div>
-              
-              {/* Lighting effect */}
-              <div className="absolute -inset-x-full -inset-y-1/2 w-[200%] h-[200%] bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 rotate-45 transform -translate-x-full group-hover:translate-x-0 transition-all duration-700"></div>
-              
-              {/* Content */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-white z-10">
-                <div className="mb-3 text-white opacity-90 group-hover:opacity-100 transform group-hover:scale-110 transition-all duration-300">
-                  {getCategoryIcon(cat)}
+              >
+                {/* Background Image */}
+                <div className="absolute inset-0">
+                  <img
+                    src={`/categories/${cat.toLowerCase()}.png`}
+                    alt={cat}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to gradient if image not found
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.parentElement!.style.background = index % 2 === 0 
+                        ? 'var(--primary-gradient)'
+                        : 'var(--secondary-gradient)';
+                    }}
+                  />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                 </div>
-                <h3 className="text-xl font-bold capitalize tracking-wide text-center">
-                  {cat === 'all' ? 'Toutes les chansons' : cat}
-                </h3>
+
+                {/* Content - Text Only */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-white z-10">
+                  <h3 
+                    className="text-4xl font-bold capitalize tracking-wide text-center drop-shadow-2xl"
+                    style={{
+                      textShadow: '0 4px 8px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.3)'
+                    }}
+                  >
+                    {cat === 'all' ? 'Toutes les chansons' : cat}
+                  </h3>
+                </div>
                 
-                {/* Hover indicator */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-white scale-0 group-hover:scale-100 transition-transform duration-300"></div>
-              </div>
+                {/* Use CSS variables for gradients - important for theme switching */}
+                <div 
+                  className="absolute inset-0 opacity-80 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none mix-blend-overlay"
+                  style={{
+                    background: index % 2 === 0 
+                      ? 'var(--primary-gradient)'
+                      : 'var(--secondary-gradient)'
+                  }}
+                ></div>
+                
+                {/* Animated pattern overlay */}
+                <div className="absolute inset-0 bg-[url('/pattern.png')] bg-repeat opacity-10 group-hover:opacity-20 transition-opacity"></div>
+                
+                {/* Lighting effect */}
+                <div className="absolute -inset-x-full -inset-y-1/2 w-[200%] h-[200%] bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 rotate-45 transform -translate-x-full group-hover:translate-x-0 transition-all duration-700"></div>
               
-              {/* Selection indicator */}
-              {selectedCategory === cat && (
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center"
-                >
-                  <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin"></div>
-                </motion.div>
-              )}
-            </button>
-          </motion.div>
+                {/* Selection indicator */}
+                {selectedCategory === cat && (
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center"
+                  >
+                    <div className="w-16 h-16 border-t-4 border-b-4 border-white rounded-full animate-spin"></div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          </SwiperSlide>
         ))}
-      </div>
+      </Swiper>
     </motion.div>
   );
 }

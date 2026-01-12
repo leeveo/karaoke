@@ -20,8 +20,11 @@ if (!bucketName) {
 
 /**
  * Upload un fichier sur AWS S3 avec ACL public-read
+ * @param file - Le blob à uploader
+ * @param filename - Le chemin du fichier (key S3)
+ * @param userEmail - Email optionnel à taguer sur l'objet S3
  */
-export async function uploadToS3(file: Blob, filename: string): Promise<string | null> {
+export async function uploadToS3(file: Blob, filename: string, userEmail?: string): Promise<string | null> {
   try {
     if (!bucketName) {
       console.error('Bucket name is missing - cannot upload');
@@ -45,6 +48,34 @@ export async function uploadToS3(file: Blob, filename: string): Promise<string |
             resolve(null);
           } else {
             console.log('Upload successful:', data.Location);
+            
+            // Add tags to the object if userEmail is provided
+            if (userEmail) {
+              try {
+                s3.putObjectTagging({
+                  Bucket: bucketName,
+                  Key: filename,
+                  Tagging: {
+                    TagSet: [
+                      {
+                        Key: 'user_email',
+                        Value: userEmail
+                      }
+                    ]
+                  }
+                }, (tagErr) => {
+                  if (tagErr) {
+                    console.warn('Warning: Could not add tags to S3 object:', tagErr);
+                    // Don't fail the upload if tagging fails
+                  } else {
+                    console.log('Tags added to S3 object successfully');
+                  }
+                });
+              } catch (tagError) {
+                console.warn('Warning: Error adding tags to S3 object:', tagError);
+                // Don't fail the upload if tagging fails
+              }
+            }
             
             // After upload, generate a presigned URL with a long expiration time
             try {

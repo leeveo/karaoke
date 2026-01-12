@@ -17,27 +17,10 @@ export default function QRPage() {
       // If URL is from querystring, verify it works properly
       if (pageUrl) {
         try {
-          // If it's an S3 URL, try to get a signed version
+          // If it's an S3 URL, note that it might have access restrictions
           if (pageUrl.includes('s3.amazonaws.com')) {
             console.log("Processing S3 URL");
-            
-            // Extract the key from the S3 URL
-            const urlObj = new URL(pageUrl);
-            const path = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-            
-            // Try to get a fresh signed URL
-            try {
-              const newSignedUrl = await getSignedUrl(path);
-              if (newSignedUrl) {
-                console.log("Generated new signed URL");
-                setPageUrl(newSignedUrl);
-                sessionStorage.setItem('video-s3-url-signed', newSignedUrl);
-                return;
-              }
-            } catch (signError) {
-              console.warn("Could not generate new signed URL:", signError);
-              // Continue with current URL
-            }
+            setLoadError("Note: S3 URLs might have access restrictions. If sharing doesn't work, try re-uploading.");
           }
           
           // For non-S3 URLs or if signing failed, use direct URL but check access
@@ -133,7 +116,7 @@ export default function QRPage() {
   };
 
   // Fonction pour envoyer l'email via notre API
-  const sendEmail = async () => {
+  const sendEmail = async (videoUrl?: string) => {
     try {
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -145,7 +128,7 @@ export default function QRPage() {
           email: formData.email,
           subject: formData.subject,
           message: formData.message,
-          videoUrl: pageUrl,
+          videoUrl: videoUrl || pageUrl,
           sessionId: sessionId
         }),
       });
@@ -162,22 +145,37 @@ export default function QRPage() {
     }
   };
 
+  // Extract old S3 key from video URL for renaming
+  const extractS3Key = (url: string): string | null => {
+    // Pattern: https://bucket.s3.amazonaws.com/karaoke-videos/sessionId-timestamp.webm
+    const match = url.match(/s3\.[\w-]*\.?amazonaws\.com\/(.+?)(?:\?|$)/);
+    if (!match) return null;
+    // Remove query parameters if any
+    return match[1].split('?')[0];
+  };
+
   // Gérer la soumission du formulaire - les champs cachés sont toujours envoyés
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('✓ handleSubmit called - form submitted');
+    console.log('✓ pageUrl:', pageUrl);
+    console.log('✓ pageUrl includes s3?', pageUrl?.includes('s3.amazonaws.com'));
     
     // Validation des champs
     if (!formData.name.trim()) {
+      console.log('✗ Name validation failed');
       setFormError('Le nom est requis');
       return;
     }
     
     if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) {
+      console.log('✗ Email validation failed');
       setFormError('Email invalide');
       return;
     }
     
     if (!formData.rgpdConsent) {
+      console.log('✗ RGPD consent not accepted');
       setFormError('Vous devez accepter les conditions RGPD');
       return;
     }
@@ -185,15 +183,65 @@ export default function QRPage() {
     setFormError('');
     setIsSubmitting(true);
     
+    let videoUrlForEmail = pageUrl; // Default to original URL
+    
     try {
-      // Envoyer l'email via notre API avec tous les champs (y compris sujet et message)
-      await sendEmail();
+      // Step 1: Extract event ID from sessionId (or use from params)
+      const eventId = (sessionId as string) || 'unknown';
+      
+      console.log('✓ Validation passed - starting email/rename process');
+      
+      // Step 2: Rename video on S3 to include email in filename
+      if (pageUrl && pageUrl.includes('.s3') && pageUrl.includes('amazonaws.com')) {
+        const oldKey = extractS3Key(pageUrl);
+        console.log('✓ extractS3Key result:', oldKey);
+        if (oldKey) {
+          console.log('✓ Renaming video with email:', formData.email);
+          try {
+            console.log('✓ Calling /api/rename-video with oldKey:', oldKey);
+            const renameResponse = await fetch('/api/rename-video', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                oldKey,
+                userEmail: formData.email,
+                eventId,
+              }),
+            });
+
+            if (!renameResponse.ok) {
+              const errorData = await renameResponse.json();
+              console.warn('✗ Warning: Video rename failed, continuing anyway:', errorData);
+              // Continue with email send even if rename fails
+            } else {
+              const renameData = await renameResponse.json();
+              console.log('✓ Video renamed successfully:', renameData.newKey);
+              // Update the URL for the email with the new renamed URL
+              videoUrlForEmail = renameData.newS3Url;
+              console.log('✓ Using renamed video URL for email:', videoUrlForEmail);
+            }
+          } catch (renameError) {
+            console.warn('✗ Error during video rename:', renameError);
+            // Continue with email send even if rename fails
+          }
+        } else {
+          console.log('✗ Could not extract S3 key from URL');
+        }
+      } else {
+        console.log('✗ pageUrl is not S3 URL or empty:', pageUrl);
+      }
+
+      // Step 3: Envoyer l'email via notre API avec tous les champs (y compris sujet et message)
+      console.log('✓ Sending email with videoUrlForEmail:', videoUrlForEmail);
+      await sendEmail(videoUrlForEmail);
       
       // Marquer comme envoyé
       setEmailSent(true);
       
       // Copier le lien dans le presse-papiers
-      await navigator.clipboard.writeText(pageUrl as string);
+      await navigator.clipboard.writeText(videoUrlForEmail as string);
       
       // Afficher un message de succès
       alert('Email envoyé avec succès et lien copié dans le presse-papiers!');
@@ -202,7 +250,7 @@ export default function QRPage() {
       setShowForm(false);
       
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du formulaire:', error);
+      console.error('✗ Error during form submission:', error);
       setFormError('Erreur lors de l\'envoi de l\'email, veuillez réessayer');
     } finally {
       setIsSubmitting(false);
@@ -352,8 +400,7 @@ export default function QRPage() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="Entrez votre nom"
                   />
@@ -371,8 +418,7 @@ export default function QRPage() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
                     style={{ 
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      focusRing: 'var(--primary-color)' 
+                      borderColor: 'rgba(139, 92, 246, 0.3)'
                     }}
                     placeholder="votre@email.com"
                   />

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiMenu, FiBell, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
-import { signOut } from '@/lib/supabase/auth';
+import { signOut, getCurrentUser } from '@/lib/supabase/auth';
 import { useRouter } from 'next/navigation';
 
 interface AdminHeaderProps {
@@ -9,7 +9,18 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('Admin');
   const router = useRouter();
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
+    loadUser();
+  }, []);
 
   const handleLogout = async () => {
     await signOut();
@@ -47,16 +58,22 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
             <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
               <FiUser className="h-4 w-4" />
             </div>
-            <span className="hidden md:block text-sm font-medium text-gray-700">Admin</span>
+            <span className="hidden md:block text-sm font-medium text-gray-700" title={userEmail}>
+              {userEmail.length > 20 ? userEmail.substring(0, 20) + '...' : userEmail}
+            </span>
           </button>
           
           {isProfileMenuOpen && (
             <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-30">
               <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="user-menu">
+                <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+                  {userEmail}
+                </div>
                 <a
                   href="/admin/settings"
                   className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   role="menuitem"
+                  onClick={() => setIsProfileMenuOpen(false)}
                 >
                   <FiSettings className="mr-2 h-4 w-4" />
                   Paramètres

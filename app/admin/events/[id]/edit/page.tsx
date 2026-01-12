@@ -9,6 +9,8 @@ import { Event, EventInput } from '@/types/event';
 export default function EditEventPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -34,6 +36,169 @@ export default function EditEventPage() {
       router.push('/admin/events');
     } catch (error) {
       console.error('Failed to update event:', error);
+    }
+  };
+
+  const handleDownloadOffline = async () => {
+    if (!event) return;
+    
+    try {
+      setIsDownloading(true);
+      setDownloadMessage(null);
+      
+      console.log(`[Admin] Starting offline download for event: ${event.id}`);
+      
+      // Fetch all songs for the event using the correct API
+      // First get all categories
+      const categoriesResponse = await fetch(`/api/songs?action=categories`);
+      if (!categoriesResponse.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      const categories = await categoriesResponse.json();
+      
+      console.log(`[Admin] Found ${categories.length} categories:`, categories);
+      
+      // Fetch all songs from all categories
+      const allSongs = [];
+      for (const category of categories) {
+        try {
+          const songsResponse = await fetch(`/api/songs?action=songs&category=${category}`);
+          if (!songsResponse.ok) continue;
+          const songs = await songsResponse.json();  // API retourne directement le tableau
+          allSongs.push(...songs);
+          console.log(`[Admin] Category ${category}: ${songs.length} songs`);
+        } catch (err) {
+          console.warn(`Failed to fetch songs for category ${category}:`, err);
+        }
+      }
+      
+      console.log(`[Admin] Total songs downloaded: ${allSongs.length}`);
+      
+      // Store in IndexedDB
+      const { initDB, storeOfflineEvent, storeOfflineSong } = await import('@/lib/offline/db');
+      await initDB();
+      
+      // Store event with logos
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eventToStore: any = {
+        id: event.id,
+        name: event.name,
+        description: event.description || '',
+        customization: {
+          ...event.customization,
+          primary_color: event.customization?.primary_color || '',
+          secondary_color: event.customization?.secondary_color || '',
+        },
+      };
+      
+      // Download event logo
+      if (event.customization?.logo) {
+        try {
+          const logoResponse = await fetch(event.customization.logo);
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob();
+            eventToStore.customization.logoBlob = logoBlob;
+            console.log(`[Admin] Logo downloaded: ${(logoBlob.size / 1024).toFixed(2)} KB`);
+          }
+        } catch (err) {
+          console.warn(`[Admin] Failed to download logo:`, err);
+        }
+      }
+      
+      // Download event background image
+      if (event.customization?.background_image) {
+        try {
+          const bgResponse = await fetch(event.customization.background_image);
+          if (bgResponse.ok) {
+            const bgBlob = await bgResponse.blob();
+            eventToStore.customization.backgroundImageBlob = bgBlob;
+            console.log(`[Admin] Background image downloaded: ${(bgBlob.size / 1024 / 1024).toFixed(2)} MB`);
+          }
+        } catch (err) {
+          console.warn(`[Admin] Failed to download background image:`, err);
+        }
+      }
+      
+      await storeOfflineEvent(eventToStore);
+      console.log(`[Admin] Event stored in IndexedDB`);
+      
+      // Store all songs with images
+      let successCount = 0;
+      let totalSizeDownloaded = 0;
+      
+      for (const song of allSongs) {
+        try {
+          // Get signed URL for the song
+          const urlResponse = await fetch(`/api/songs?action=url&key=${encodeURIComponent(song.key)}`);
+          if (!urlResponse.ok) {
+            console.warn(`Failed to get URL for song ${song.key}`);
+            continue;
+          }
+          const urlData = await urlResponse.json();
+          const songUrl = urlData.url;
+          
+          // Fetch song blob
+          const songResponse = await fetch(songUrl);
+          if (!songResponse.ok) {
+            console.warn(`Failed to fetch song blob: ${song.title}`);
+            continue;
+          }
+          const blob = await songResponse.blob();
+          totalSizeDownloaded += blob.size;
+          
+          // Download song image if available
+          let imageBlob: Blob | undefined;
+          if (song.imageUrl) {
+            try {
+              const imgResponse = await fetch(song.imageUrl);
+              if (imgResponse.ok) {
+                imageBlob = await imgResponse.blob();
+                totalSizeDownloaded += imageBlob.size;
+                console.log(`[Admin] Song image downloaded: ${song.title}`);
+              }
+            } catch (err) {
+              console.warn(`[Admin] Failed to download image for ${song.title}:`, err);
+            }
+          }
+          
+          await storeOfflineSong({
+            id: `${event.id}-${song.key}`,
+            title: song.title || 'Unknown',
+            artist: song.artist || 'Unknown',
+            categoryId: song.categoryId || 'all',
+            blob,
+            size: blob.size,
+            key: song.key,
+            imageBlob,
+            imageUrl: song.imageUrl,
+          });
+          
+          successCount++;
+          console.log(`[Admin] Song stored: ${song.title} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        } catch (err) {
+          console.warn(`[Admin] Failed to download song ${song.key}:`, err);
+        }
+      }
+      
+      const totalSizeMB = (totalSizeDownloaded / 1024 / 1024).toFixed(2);
+      setDownloadMessage({
+        type: 'success',
+        text: `✅ ${event.name} téléchargé pour utilisation hors ligne! (${successCount}/${allSongs.length} chansons + images - ${totalSizeMB}MB)`,
+      });
+      
+      console.log(`[Admin] Successfully downloaded event: ${event.id}`);
+      
+    } catch (error) {
+      console.error('[Admin] Error downloading offline:', error);
+      setDownloadMessage({
+        type: 'error',
+        text: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+      });
+    } finally {
+      setIsDownloading(false);
+      if (downloadMessage?.type === 'success') {
+        setTimeout(() => setDownloadMessage(null), 5000);
+      }
     }
   };
 
@@ -71,8 +236,45 @@ export default function EditEventPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Modifier l&apos;Événement</h1>
-      <EventForm onSubmit={handleSubmit} initialData={prepareFormData(event)} />
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-800">Modifier l&apos;Événement</h1>
+        {event && (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleDownloadOffline}
+              disabled={isDownloading}
+              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                isDownloading
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
+                  : 'bg-green-600 text-white hover:bg-green-700 active:scale-95'
+              }`}
+            >
+              {isDownloading ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  Téléchargement...
+                </>
+              ) : (
+                <>
+                  <span>⬇️</span>
+                  Télécharger pour hors ligne
+                </>
+              )}
+            </button>
+            
+            {downloadMessage && (
+              <div className={`p-3 rounded-lg text-sm font-medium ${
+                downloadMessage.type === 'success' 
+                  ? 'bg-green-50 text-green-800 border border-green-200' 
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {downloadMessage.text}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <EventForm onSubmit={handleSubmit} initialData={prepareFormData(event!)} />
     </div>
   );
 }

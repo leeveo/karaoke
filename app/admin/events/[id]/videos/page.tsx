@@ -6,7 +6,7 @@ import { getEventVideos, VideoItem, getSignedVideoUrl, deleteS3Video, deleteAllE
 import { fetchEventById } from '@/lib/supabase/events';
 import Link from 'next/link';
 import { Event } from '@/types/event';
-import { FiDownload, FiEye, FiChevronLeft, FiPlay, FiVideo, FiX, FiClock, FiTrash2, FiAlertTriangle, FiCheck, FiCopy } from 'react-icons/fi';
+import { FiDownload, FiEye, FiChevronLeft, FiVideo, FiX, FiTrash2, FiAlertTriangle, FiCheck, FiCopy } from 'react-icons/fi';
 
 export default function EventVideosAdminPage() {
   const { id } = useParams();
@@ -30,6 +30,13 @@ export default function EventVideosAdminPage() {
   const [viewingVideo, setViewingVideo] = useState<VideoItem | null>(null);
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [urlCopied, setUrlCopied] = useState(false);
+  
+  // Nouveaux états pour batch email
+  const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [showBatchEmailConfirm, setShowBatchEmailConfirm] = useState(false);
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
+  const [batchEmailError, setBatchEmailError] = useState<string | null>(null);
+  const [batchEmailSuccess, setBatchEmailSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -206,23 +213,248 @@ export default function EventVideosAdminPage() {
       });
   };
 
+  // Fonction pour toggle la sélection d'une vidéo
+  const toggleVideoSelection = (videoKey: string) => {
+    const newSelected = new Set(selectedVideos);
+    if (newSelected.has(videoKey)) {
+      newSelected.delete(videoKey);
+    } else {
+      newSelected.add(videoKey);
+    }
+    setSelectedVideos(newSelected);
+  };
+
+  // Fonction pour envoyer les emails batch
+  const handleSendBatchEmails = () => {
+    if (selectedVideos.size === 0) {
+      setBatchEmailError("Aucune vidéo sélectionnée");
+      return;
+    }
+    setShowBatchEmailConfirm(true);
+  };
+
+  // Fonction pour confirmer et envoyer les emails
+  const confirmSendBatchEmails = async () => {
+    try {
+      setIsSendingEmails(true);
+      setBatchEmailError(null);
+      setBatchEmailSuccess(null);
+
+      // Préparer les vidéos sélectionnées avec leurs emails
+      const videosToEmail = videos.filter(v => selectedVideos.has(v.key));
+      
+      // Grouper par email
+      const emailGroups: { [email: string]: VideoItem[] } = {};
+      for (const video of videosToEmail) {
+        // Utiliser l'email du service, sinon l'email extrait du nom de fichier, sinon fallback
+        const email = video.userEmail || getEmailFromKey(video.key) || 'unknown@example.com';
+        if (!emailGroups[email]) {
+          emailGroups[email] = [];
+        }
+        emailGroups[email].push(video);
+      }
+
+      // Appeler l'API pour envoyer les emails
+      const response = await fetch('/api/admin/send-batch-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: id,
+          emailGroups: emailGroups
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setBatchEmailSuccess(`✅ ${result.videosCount || result.successCount} vidéo(s) envoyée(s) avec succès!`);
+        setSelectedVideos(new Set());
+        setShowBatchEmailConfirm(false);
+        
+        // Réinitialiser le message après 5 secondes
+        setTimeout(() => setBatchEmailSuccess(null), 5000);
+      } else {
+        setBatchEmailError(result.error || 'Erreur lors de l\'envoi des emails');
+      }
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi batch:', err);
+      setBatchEmailError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsSendingEmails(false);
+    }
+  };
+
+  // Fonction pour extraire l'email du filename
+  const getEmailFromKey = (key: string): string | undefined => {
+    try {
+      const filename = key.split('/').pop() || '';
+      
+      // Format: songPath_email-timestamp.webm (email can be literal or URL-encoded)
+      if (filename.includes('_')) {
+        const parts = filename.split('_');
+        if (parts.length >= 2) {
+          const emailTimestampPart = parts[1];
+          // Email is before the first hyphen followed by digits (the timestamp)
+          const emailMatch = emailTimestampPart.match(/^(.+?)-\d+\.webm$/);
+          if (emailMatch) {
+            let email = emailMatch[1]; // Get the email part
+            // Decode if it contains URL-encoded characters (e.g., %40 for @)
+            if (email.includes('%')) {
+              email = decodeURIComponent(email);
+            }
+            return email;
+          }
+        }
+      }
+      
+      return undefined;
+    } catch (error) {
+      console.error("Erreur lors de l'extraction de l'email:", error);
+      return undefined;
+    }
+  };
+
+  // Fonction pour extraire le titre de la vidéo à partir de la clé
+  const getSongNameFromKey = (key: string): string => {
+    try {
+      const filename = key.split('/').pop() || '';
+      console.log('🔍 getSongNameFromKey - filename:', filename);
+      
+      // NOUVEAU FORMAT: songPath_emailEncoded-timestamp.webm
+      if (filename.includes('_')) {
+        console.log('📋 Nouveau format détecté (avec _)');
+        const parts = filename.split('_');
+        const songPathPart = parts[0];
+        
+        // Décode DEUX FOIS (double encoding)
+        let decodedPath = decodeURIComponent(songPathPart);
+        console.log('✅ First decode:', decodedPath);
+        
+        decodedPath = decodeURIComponent(decodedPath);
+        console.log('✅ Second decode:', decodedPath);
+        
+        // Extrait juste le dernier segment après le dernier /
+        let songNameFull = decodedPath.split('/').pop() || '';
+        console.log('📝 Song name full (before timestamp removal):', songNameFull);
+        
+        // Enlève le timestamp qui pourrait être attaché au .mp4
+        songNameFull = songNameFull.replace(/\.mp4-\d+$/, '');
+        console.log('📝 Song name full (after timestamp removal):', songNameFull);
+        
+        return formatSongName(songNameFull);
+      } 
+      // ANCIEN FORMAT: Karaokesaas%2fanglais%2ftitle-artist-category.mp4-timestamp.webm
+      else {
+        console.log('📋 Ancien format détecté (sans _)');
+        
+        // Décode TOUT le filename
+        const decoded = decodeURIComponent(filename);
+        console.log('✅ Decoded filename:', decoded);
+        
+        // Enlève le timestamp et l'extension: .mp4-TIMESTAMP.webm → rien
+        let withoutExt = decoded.replace(/\.mp4-\d+\.webm$/, '');
+        console.log('📝 After removing .mp4-timestamp.webm:', withoutExt);
+        
+        // Si ça n'a pas marché, essaie juste d'enlever l'extension
+        if (withoutExt === decoded) {
+          withoutExt = decoded.replace(/\.(mp4|mp3|webm)(-\d+)?$/, '');
+          console.log('📝 Fallback - After extension removal:', withoutExt);
+        }
+        
+        // Extrait le dernier segment après le dernier /
+        const lastSegment = withoutExt.split('/').pop() || '';
+        console.log('📝 Last segment:', lastSegment);
+        
+        // Enlève la catégorie (dernier mot après tiret)
+        // Pattern: "title - artist-category" -> enlever "-category"
+        const noCategory = lastSegment.replace(/-[a-z]+$/i, '');
+        console.log('📝 Without category:', noCategory);
+        
+        return formatSongName(noCategory);
+      }
+    } catch (error) {
+      console.error("❌ Erreur lors de l'extraction du nom:", error);
+      return 'Vidéo';
+    }
+  };
+
+  // Fonction helper pour formater le nom de la chanson
+  const formatSongName = (songName: string): string => {
+    if (!songName) return 'Vidéo';
+    
+    console.log('🎵 formatSongName input:', songName);
+    
+    // Remplacer les # par des - (certains fichiers utilisent # comme séparateur)
+    songName = songName.replace(/#/g, '-');
+    
+    // Supprimer les catégories répétées à la fin (ex: "Title - Artist - anglais - anglais.mp4")
+    // Patterns à supprimer: "-anglais", "-francais", etc. et .mp4
+    songName = songName
+      .replace(/-(anglais|francais|espanol|deutsch|italiano|portugues|chinese|japanese|korean)$/i, '')
+      .replace(/-(anglais|francais|espanol|deutsch|italiano|portugues|chinese|japanese|korean)-\1$/i, '-$1')
+      .replace(/\.mp4$/i, '');
+    
+    // Split par tiret pour séparer titre et artiste
+    // Pattern attendu: "Title - Artist"
+    if (songName.includes('-')) {
+      const parts = songName.split('-');
+      const title = parts[0].trim();
+      const artist = parts.slice(1).join('-').trim();
+      
+      console.log('🎬 Title:', title, '🎤 Artist:', artist);
+      
+      // Formater chaque partie
+      const formattedTitle = capitalizeWords(title);
+      const formattedArtist = capitalizeWords(artist);
+      
+      const result = `${formattedTitle} - ${formattedArtist}`;
+      console.log('✨ Final result:', result);
+      return result;
+    }
+    
+    // Si pas de tiret
+    const result = capitalizeWords(songName);
+    console.log('✨ Final result (no dash):', result);
+    return result;
+  };
+
+  // Fonction helper pour capitaliser les mots
+  const capitalizeWords = (str: string): string => {
+    return str
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
   // Fonction pour extraire un titre convivial à partir de la clé vidéo
   const getFormattedSongTitle = (videoKey: string): string => {
     try {
       // Extraire le nom de fichier (dernière partie du chemin)
       const filename = videoKey.split('/').pop() || '';
       
-      // Extraire le song_id (partie avant le tiret et le timestamp)
-      const songId = filename.split('-')[0];
+      // Split par _ pour séparer le titre du email et du timestamp
+      // Format: songPathEncoded_emailEncoded-timestamp.webm
+      const parts = filename.split('_');
       
-      if (!songId) return "Vidéo";
+      if (parts.length === 0) return "Vidéo";
       
-      // Décoder l'URI du song_id pour avoir le chemin complet
-      const decodedSongId = decodeURIComponent(songId);
+      // Première partie = le chemin de la chanson encodé
+      const encodedSongPath = parts[0];
       
-      // Extraire le nom du fichier sans extension
-      const songFilename = decodedSongId.split('/').pop() || '';
-      const songNameWithoutExt = songFilename.replace(/\.(mp4|mp3|webm)$/, '');
+      // Décode l'URI pour obtenir le chemin complet
+      const decodedSongPath = decodeURIComponent(encodedSongPath);
+      
+      // Extrait SEULEMENT le dernier segment (le nom de la chanson)
+      const songName = decodedSongPath.split('/').pop() || '';
+      
+      if (!songName) return "Vidéo";
+      
+      // Retire l'extension du fichier
+      const songNameWithoutExt = songName.replace(/\.(mp4|mp3|webm)$/, '');
       
       // Formater le nom pour qu'il soit plus lisible
       return songNameWithoutExt.replace(/_/g, ' ');
@@ -264,14 +496,25 @@ export default function EventVideosAdminPage() {
           <FiChevronLeft className="mr-1" /> Retour à l&apos;événement
         </Link>
         
-        {videos.length > 0 && (
-          <button 
-            onClick={handleDeleteAllVideos}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
-          >
-            <FiTrash2 className="mr-2" /> Supprimer toutes les vidéos
-          </button>
-        )}
+        <div className="flex gap-3">
+          {selectedVideos.size > 0 && (
+            <button 
+              onClick={handleSendBatchEmails}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              ✉️ Envoyer {selectedVideos.size} email(s)
+            </button>
+          )}
+          
+          {videos.length > 0 && (
+            <button 
+              onClick={handleDeleteAllVideos}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              <FiTrash2 className="mr-2" /> Supprimer toutes les vidéos
+            </button>
+          )}
+        </div>
       </div>
       
       <h1 className="text-2xl font-semibold text-gray-800">
@@ -292,6 +535,20 @@ export default function EventVideosAdminPage() {
         </div>
       )}
       
+      {batchEmailSuccess && (
+        <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-md text-green-700 flex items-center">
+          <FiCheck className="h-5 w-5 mr-2" />
+          <span>{batchEmailSuccess}</span>
+        </div>
+      )}
+
+      {batchEmailError && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md text-red-700 flex items-center">
+          <FiAlertTriangle className="h-5 w-5 mr-2" />
+          <span>{batchEmailError}</span>
+        </div>
+      )}
+      
       {videos.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="mx-auto w-16 h-16 flex items-center justify-center rounded-full bg-gray-100">
@@ -306,100 +563,83 @@ export default function EventVideosAdminPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {videos.map((video, index) => {
-            // Amélioration de l'extraction du nom de la chanson à partir du song_id
-            const getSongNameFromKey = (key: string): string => {
-              try {
-                // Extrait le nom de fichier de la vidéo (dernière partie du chemin)
-                const filename = key.split('/').pop() || '';
-                
-                // Extrait le song_id (partie avant le tiret et le timestamp)
-                const songId = filename.split('-')[0];
-                
-                if (!songId) return `Vidéo ${index + 1}`;
-                
-                // Décode l'URI du song_id pour obtenir le chemin complet
-                const decodedSongId = decodeURIComponent(songId);
-                
-                // Extrait le nom du fichier sans extension et sans chemin
-                const songFilename = decodedSongId.split('/').pop() || '';
-                const songNameWithoutExt = songFilename.replace(/\.(mp4|mp3|webm)$/, '');
-                
-                // Si le format est "titre-artiste", sépare-les et formate proprement
-                if (songNameWithoutExt.includes('-')) {
-                  const [title, artist] = songNameWithoutExt.split('-');
-                  // Ajouter "Titre : " devant le nom de la chanson
-                  return `Titre : ${title.trim()} - ${artist.trim()}`.replace(/_/g, ' ');
-                }
-                
-                // Sinon retourne juste le nom de fichier formaté avec le préfixe "Titre : "
-                return `Titre : ${songNameWithoutExt.replace(/_/g, ' ')}`;
-              } catch (error) {
-                console.error("Erreur lors de l'extraction du nom de la chanson:", error);
-                return `Vidéo ${index + 1}`;
-              }
-            };
-            
-            // Utilise la nouvelle fonction pour obtenir un nom plus lisible
-            const displayName = getSongNameFromKey(video.key);
-            
-            // Extraire la clé courte pour l'URL (juste le nom du fichier sans le chemin complet)
-            const shortKey = video.key.split('/').pop() || '';
-            
-            return (
-              <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                <div 
-                  className="aspect-video bg-gray-100 relative cursor-pointer" 
-                  onClick={() => router.push(`/admin/events/${id}/videos/${encodeURIComponent(shortKey)}`)}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="rounded-full bg-black/50 p-4">
-                      <FiPlay className="h-10 w-10 text-white" />
-                    </div>
-                  </div>
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Titre</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Email</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Date/Heure</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {videos.map((video, index) => {
+                  const displayName = getSongNameFromKey(video.key);
+                  const emailFromFilename = getEmailFromKey(video.key);
+                  const displayEmail = video.userEmail || emailFromFilename || '-';
                   
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white flex justify-between items-center">
-                      <span className="text-sm font-medium truncate">{displayName}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium text-gray-900 line-clamp-1">{displayName}</h3>
-                  <p className="text-sm text-gray-500 mt-1 flex items-center">
-                    <FiClock className="mr-1 h-4 w-4" />
-                    {formatDate(video.dateCreated)}
-                  </p>
-                  <div className="mt-3 flex justify-between">
-                    {/* Modifier le bouton "Voir" pour ouvrir la modal au lieu de naviguer */}
-                    <button
-                      onClick={() => openVideoViewer(video)}
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                    >
-                      <FiEye className="mr-1 h-4 w-4" /> Voir
-                    </button>
-                    
-                    <a
-                      href={video.url}
-                      download
-                      className="text-green-600 hover:text-green-800 text-sm flex items-center"
-                    >
-                      <FiDownload className="mr-1 h-4 w-4" /> Télécharger
-                    </a>
-                    
-                    {/* Ajouter le bouton de suppression */}
-                    <button
-                      onClick={() => handleDeleteVideo(video)}
-                      className="text-red-600 hover:text-red-800 text-sm flex items-center"
-                    >
-                      <FiTrash2 className="mr-1 h-4 w-4" /> Supprimer
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                  return (
+                    <tr key={index} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="font-medium truncate max-w-xs" title={displayName}>
+                          {displayName}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        <div className="truncate max-w-xs" title={displayEmail}>
+                          {displayEmail}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                        {formatDate(video.dateCreated)}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <button
+                            onClick={() => openVideoViewer(video)}
+                            className="text-blue-600 hover:text-blue-800 font-medium flex items-center text-xs sm:text-sm"
+                            title="Voir la vidéo"
+                          >
+                            <FiEye className="mr-1 h-4 w-4" /> 
+                            <span className="hidden sm:inline">Voir</span>
+                          </button>
+                          
+                          
+                          <a
+                            href={video.url}
+                            download
+                            className="text-green-600 hover:text-green-800 font-medium flex items-center text-xs sm:text-sm"
+                            title="Télécharger la vidéo"
+                          >
+                            <FiDownload className="mr-1 h-4 w-4" />
+                            <span className="hidden sm:inline">DL</span>
+                          </a>
+                          
+                          <button
+                            onClick={() => handleDeleteVideo(video)}
+                            className="text-red-600 hover:text-red-800 font-medium flex items-center text-xs sm:text-sm"
+                            title="Supprimer la vidéo"
+                          >
+                            <FiTrash2 className="h-4 w-4" />
+                          </button>
+                          
+                          <input
+                            type="checkbox"
+                            checked={selectedVideos.has(video.key)}
+                            onChange={() => toggleVideoSelection(video.key)}
+                            className="w-4 h-4 cursor-pointer"
+                            title="Sélectionner"
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       
@@ -567,6 +807,54 @@ export default function EventVideosAdminPage() {
                   onClick={() => setShowDeleteAllConfirm(false)}
                   className="px-4 py-3 border border-gray-300 rounded-md"
                   disabled={deleteLoading}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de confirmation pour l'envoi batch d'emails */}
+      {showBatchEmailConfirm && selectedVideos.size > 0 && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-lg overflow-hidden">
+            <div className="bg-blue-600 p-4 flex justify-center">
+              <FiCheck className="h-12 w-12 text-white" />
+            </div>
+            
+            <div className="p-6">
+              <h3 className="text-lg font-medium mb-4">Confirmer l&apos;envoi des emails</h3>
+              <p className="mb-4 text-gray-600">
+                Êtes-vous sûr de vouloir envoyer <span className="font-bold">{selectedVideos.size}</span> email(s) avec les vidéos sélectionnées?
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Les utilisateurs recevront leurs vidéos directement par email.
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={confirmSendBatchEmails}
+                  className="px-4 py-3 bg-blue-600 text-white rounded-md flex items-center justify-center hover:bg-blue-700"
+                  disabled={isSendingEmails}
+                >
+                  {isSendingEmails ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    <>
+                      ✉️ Envoyer les emails
+                    </>
+                  )}
+                </button>
+                
+                <button 
+                  onClick={() => setShowBatchEmailConfirm(false)}
+                  className="px-4 py-3 border border-gray-300 rounded-md"
+                  disabled={isSendingEmails}
                 >
                   Annuler
                 </button>

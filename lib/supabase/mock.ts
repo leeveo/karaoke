@@ -59,17 +59,18 @@ export async function createEvent(eventInput: EventInput): Promise<string> {
   const newEvent: Event = {
     id: newId,
     name: eventInput.name,
-    description: eventInput.description,
+    description: '',
     date: eventInput.date,
-    location: eventInput.location,
+    location: '',
     created_at: new Date().toISOString(),
     user_id: 'user123',
-    is_active: eventInput.is_active,
+    is_active: true,
     customization: {
       event_id: newId,
-      primary_color: eventInput.primary_color,
-      secondary_color: eventInput.secondary_color,
-      background_image: eventInput.background_image,
+      primary_color: eventInput.customization.primary_color,
+      secondary_color: eventInput.customization.secondary_color,
+      background_image: eventInput.customization.background_image || null,
+      logo: eventInput.customization.logo || null,
     },
   };
   mockEvents.push(newEvent);
@@ -86,15 +87,13 @@ export async function updateEvent(id: string, eventInput: EventInput): Promise<v
   mockEvents[eventIndex] = {
     ...mockEvents[eventIndex],
     name: eventInput.name,
-    description: eventInput.description,
     date: eventInput.date,
-    location: eventInput.location,
-    is_active: eventInput.is_active,
     customization: {
       event_id: id,
-      primary_color: eventInput.primary_color,
-      secondary_color: eventInput.secondary_color,
-      background_image: eventInput.background_image,
+      primary_color: eventInput.customization.primary_color,
+      secondary_color: eventInput.customization.secondary_color,
+      background_image: eventInput.customization.background_image || null,
+      logo: eventInput.customization.logo || null,
     },
   };
 }

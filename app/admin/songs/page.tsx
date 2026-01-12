@@ -57,9 +57,9 @@ export default function SongsPage() {
   }, [selectedCategory]);
 
   // Filtrer les chansons par terme de recherche
-  const filteredSongs = songs.filter(song => 
-    song.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSongs = songs
+    .filter(song => song.name.toLowerCase().endsWith('.mp4')) // Ne garder que les fichiers .mp4
+    .filter(song => song.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   // Fonction pour extraire le titre et l'artiste du nom de fichier
   const parseSongName = (fileName: string): { title: string; artist: string } => {
@@ -196,6 +196,9 @@ export default function SongsPage() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Image
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Titre / Artiste
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -210,8 +213,26 @@ export default function SongsPage() {
                         {filteredSongs.map((song) => {
                           const { title, artist } = parseSongName(song.name);
                           
+                          // Construire l'URL de l'image depuis S3
+                          // Le nom du fichier sans extension + .png
+                          const songNameWithoutExt = song.name.replace(/\.[^/.]+$/, '');
+                          const imageUrl = `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET}.s3.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/karaokesaas/${selectedCategory}/${encodeURIComponent(songNameWithoutExt)}.png`;
+                          
                           return (
                             <tr key={song.key} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex-shrink-0 h-16 w-16">
+                                  <img 
+                                    src={imageUrl} 
+                                    alt={title}
+                                    className="h-16 w-16 rounded-md object-cover"
+                                    onError={(e) => {
+                                      // Si l'image n'existe pas, afficher un placeholder
+                                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23e5e7eb"/%3E%3Cpath d="M32 20v24M20 32h24" stroke="%239ca3af" stroke-width="2"/%3E%3C/svg%3E';
+                                    }}
+                                  />
+                                </div>
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-start flex-col">
                                   <div className="text-sm font-medium text-gray-900">{title}</div>

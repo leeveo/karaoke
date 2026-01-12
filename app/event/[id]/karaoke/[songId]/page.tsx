@@ -7,6 +7,7 @@ import { getSongUrl } from '@/services/s3Service';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import { supabase } from '@/lib/supabase/client';
+import { useOnlineStatus, useIndexedDB } from '@/hooks/useOfflineMode';
 
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
@@ -19,6 +20,8 @@ export default function EventKaraokePage() {
   const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const isOnline = useOnlineStatus();
+  const { loadOfflineSongsByCategory } = useIndexedDB();
   
   // Extraire le nom de la chanson à partir de l'ID
   const songName = decodedSongId.split('/').pop()?.split('.')[0] || decodedSongId;
@@ -74,6 +77,39 @@ export default function EventKaraokePage() {
         setLoading(true);
         setVideoReady(false);
         
+        // If offline, try to load from IndexedDB
+        if (!isOnline) {
+          console.log('[EventKaraoke] Offline mode - trying IndexedDB');
+          try {
+            // For offline, we need to get the song from IndexedDB
+            // The songId format is category/filename.ext or just the key
+            const songKey = decodedSongId.split('/').pop() || decodedSongId;
+            
+            // Try to find the song in any category (we'll search them all)
+            const categories = ['all', 'anglais', 'francais', 'hip-hop', 'pop', 'rap', 'rock'];
+            let foundSong = null;
+            
+            for (const category of categories) {
+              const songs = await loadOfflineSongsByCategory(category);
+              foundSong = songs.find(s => s.key === songKey || s.key.includes(songKey));
+              if (foundSong) break;
+            }
+            
+            if (foundSong && foundSong.blob) {
+              const blobUrl = URL.createObjectURL(foundSong.blob);
+              console.log('[EventKaraoke] Loaded song from IndexedDB:', foundSong.title);
+              setVideoUrl(blobUrl);
+              setVideoReady(true);
+              setLoading(false);
+              return;
+            } else {
+              console.warn('[EventKaraoke] Song not found in IndexedDB:', songKey);
+            }
+          } catch (offlineErr) {
+            console.error('[EventKaraoke] Error loading from IndexedDB:', offlineErr);
+          }
+        }
+        
         // Vérifier si c'est un chemin local ou un chemin S3
         if (decodedSongId.startsWith('karaokesaas/')) {
           // C'est une chanson S3, il faut obtenir l'URL signée
@@ -124,7 +160,8 @@ export default function EventKaraokePage() {
     }
 
     loadVideo();
-  }, [decodedSongId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decodedSongId, isOnline]);
 
   // Charger l'événement et ses personnalisations
   useEffect(() => {
@@ -278,7 +315,7 @@ export default function EventKaraokePage() {
 
   // Main content
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8"
+    <div className="min-h-screen flex flex-col items-center justify-center p-2"
       style={{
         backgroundImage: bgLoaded && event?.customization?.backgroundImageUrl 
           ? `url('${event.customization.backgroundImageUrl}')` 
@@ -290,56 +327,23 @@ export default function EventKaraokePage() {
       {/* Overlay avec dégradé */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
       
-      {/* Event name display */}
-      {event && (
-        <div className="relative z-10 mb-6 w-full max-w-5xl text-center">
-          <h2 className="text-xl font-medium" style={{ color: 'var(--primary-color)' }}>
-            {event.name}
-          </h2>
-        </div>
-      )}
-      
-      <div className="relative z-10 w-full max-w-5xl">
-        <div className="flex justify-center mb-6">
-          <button
-            onClick={handleReturn}
-            className="py-3 px-6 rounded-lg flex items-center gap-2 text-white hover:translate-y-[-2px] transition-all"
-            style={{ 
-              backgroundColor: 'var(--primary-color-75)',
-              borderLeft: '3px solid var(--primary-color)',
-              borderRight: '3px solid var(--secondary-color)',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            <span>Retour événement</span>
-          </button>
-        </div>
-        
+      <div className="relative z-10 w-full h-screen flex items-center justify-center px-2 py-2">
         {videoReady ? (
-          <div className="relative flex justify-center w-full">
-            {/* Bordure néon */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-gray-300 to-gray-100 rounded-2xl blur opacity-75 transition duration-1000"></div>
+          <div className="relative flex justify-center w-full h-full max-h-screen">
             
-            {/* Conteneur vidéo */}
-            <div className="relative bg-black/60 p-6 sm:p-8 rounded-2xl shadow-2xl border border-white/10 w-full">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-2xl pointer-events-none"></div>
-              
-              <div className="rounded-xl overflow-hidden flex justify-center">
-                <LiveKaraokeRecorder 
-                  karaokeSrc={videoUrl} 
-                  preloaded={true} 
-                  eventId={id as string} 
-                  buttonStyles={{
-                    className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
-                    icon: "🎵",
-                    text: "" // Removed the text here
-                  }}
-                />
+            <div className="w-full h-full flex justify-center items-center">
+                <div className="border-4 border-gray-400 rounded-lg shadow-lg overflow-hidden m-8">
+                  <LiveKaraokeRecorder 
+                    karaokeSrc={videoUrl} 
+                    eventId={id as string} 
+                    buttonStyles={{
+                      className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
+                      icon: "🎵",
+                      text: "" // Removed the text here
+                    }}
+                  />
+                </div>
               </div>
-            </div>
           </div>
         ) : (
           <div className="bg-black/60 p-8 rounded-2xl text-white text-center shadow-2xl border border-white/10">
@@ -349,13 +353,6 @@ export default function EventKaraokePage() {
             </div>
           </div>
         )}
-        
-        {/* Suggestions d'utilisation */}
-        <div className="mt-10 text-center">
-          <p className="text-gray-300 text-sm bg-black/30 backdrop-blur-sm inline-block px-6 py-3 rounded-full border border-gray-700/50 shadow-inner">
-            🎧 Utilisez un casque pour de meilleurs résultats
-          </p>
-        </div>
       </div>
       
       {/* Vidéo cachée pour le préchargement */}

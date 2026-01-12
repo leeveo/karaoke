@@ -46,6 +46,7 @@ function LiveKaraokeRecorderInner({
   const playingRef = useRef<boolean>(false);
   const logoRef = useRef<HTMLImageElement | null>(null);
   const cameraKitContainerRef = useRef<HTMLDivElement>(null);
+  const setupInProgressRef = useRef<boolean>(false);
   
   // Navigation
   const router = useRouter();
@@ -56,18 +57,14 @@ function LiveKaraokeRecorderInner({
   const [webcamReady, setWebcamReady] = useState(false);
   const [karaokeReady, setKaraokeReady] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  const [status, setStatus] = useState<string>("Initialisation...");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStep, setProcessingStep] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [useSnapFilters, setUseSnapFilters] = useState(false);
   
   // Utiliser le contexte CameraKit
   const { 
-    isInitialized,
     setWebcamElement,
-    session,
-    cameraKitReady
+    session
   } = useCameraKit();
 
   // Charger l'événement et son logo
@@ -203,7 +200,12 @@ function LiveKaraokeRecorderInner({
 
     const setup = async () => {
       try {
-        setStatus("Configuration...");
+        // Prevent multiple simultaneous setup attempts
+        if (setupInProgressRef.current) {
+          console.log("Setup already in progress, skipping duplicate call");
+          return;
+        }
+        setupInProgressRef.current = true;
         
         // 1. Configurer la vidéo karaoké
         if (karaokeVideoRef.current) {
@@ -222,22 +224,21 @@ function LiveKaraokeRecorderInner({
           karaokeVideoRef.current.oncanplay = () => {
             console.log("Vidéo karaoké prête");
             setKaraokeReady(true);
-            setStatus(webcamReady ? "Prêt à enregistrer" : "En attente de la webcam...");
           };
           
-          karaokeVideoRef.current.onerror = () => {  // Remove unused 'e' parameter here
+          karaokeVideoRef.current.onerror = () => {
             console.error("Erreur vidéo:", karaokeVideoRef.current?.error);
-            setStatus(`Erreur vidéo: ${karaokeVideoRef.current?.error?.message || 'inconnue'}`);
           };
         } else {
           console.error("Élément vidéo karaoké non disponible");
-          setStatus("Erreur: élément vidéo karaoké non disponible");
           return;
         }
         
         // 2. Activer la webcam
-        setStatus("Accès à la webcam...");
         try {
+          // Petit délai pour s'assurer que les refs sont bien initialisés
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
               facingMode: 'user',
@@ -250,8 +251,13 @@ function LiveKaraokeRecorderInner({
           // IMPORTANT: Vérifier que l'élément vidéo est disponible avant d'y accéder
           if (webcamVideoRef.current) {
             webcamVideoRef.current.srcObject = stream;
-            await webcamVideoRef.current.play();
-            setWebcamReady(true);
+            try {
+              await webcamVideoRef.current.play();
+              setWebcamReady(true);
+            } catch (playError) {
+              console.warn("Webcam play error (may require user interaction):", playError);
+              setWebcamReady(true); // Set ready anyway, user interaction might be needed
+            }
             
             // Initialiser Camera Kit avec le flux webcam
             console.log("Setting webcam element for CameraKit");
@@ -260,19 +266,16 @@ function LiveKaraokeRecorderInner({
             console.log("Webcam activée");
           } else {
             console.error("Élément vidéo webcam non disponible");
-            setStatus("Erreur: élément vidéo webcam non disponible");
             return;
           }
         } catch (webcamError) {
           console.error("Erreur d'accès à la webcam:", webcamError);
-          setStatus(`Erreur d'accès à la webcam: ${webcamError instanceof Error ? webcamError.message : 'Accès refusé ou webcam non disponible'}`);
           return;
         }
         
         // 3. Initialiser le canvas
         if (!canvasRef.current) {
           console.error("Élément canvas non disponible");
-          setStatus("Erreur: élément canvas non disponible");
           return;
         }
         
@@ -295,7 +298,6 @@ function LiveKaraokeRecorderInner({
           
           if (!audioDestinationRef.current) {
             console.error("Destination audio non disponible");
-            setStatus("Erreur: destination audio non disponible");
             return;
           }
           
@@ -330,7 +332,6 @@ function LiveKaraokeRecorderInner({
           };
         } catch (recorderError) {
           console.error("Erreur de configuration de l'enregistreur:", recorderError);
-          setStatus(`Erreur d'enregistrement: ${recorderError instanceof Error ? recorderError.message : 'Configuration impossible'}`);
           return;
         }
         
@@ -346,7 +347,7 @@ function LiveKaraokeRecorderInner({
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
             
             // Dessiner la webcam ou le flux Camera Kit
-            if (useSnapFilters && session?.output?.live) {
+            if (session?.output?.live) {
               try {
                 // Dessiner le canvas de Camera Kit qui contient déjà les filtres
                 ctx.drawImage(
@@ -392,8 +393,8 @@ function LiveKaraokeRecorderInner({
             
             // Toujours afficher le logo, qu'on soit en enregistrement ou non
             if (logoRef.current && logoLoaded) {
-              // Logo plus grand et plus visible
-              const logoWidth = canvasRef.current.width * 0.20;
+              // Logo réduit de 50% - taille 10% au lieu de 20%
+              const logoWidth = canvasRef.current.width * 0.10;
               const logoHeight = (logoRef.current.height / logoRef.current.width) * logoWidth;
               
               // Position en haut à droite
@@ -442,11 +443,9 @@ function LiveKaraokeRecorderInner({
         // Démarrer la boucle de dessin
         drawFrame();
         
-        setStatus("Prêt à enregistrer");
-        
       } catch (err) {
         console.error("Erreur lors de l'initialisation:", err);
-        setStatus(`Erreur: ${err instanceof Error ? err.message : "initialisation"}`);
+        setupInProgressRef.current = false;
       }
     };
 
@@ -454,6 +453,8 @@ function LiveKaraokeRecorderInner({
 
     // Nettoyage
     return () => {
+      setupInProgressRef.current = false;
+      
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
@@ -462,22 +463,26 @@ function LiveKaraokeRecorderInner({
         mediaRecorderRef.current.stop();
       }
 
-      if (karaokeVideoRef.current) {
-        karaokeVideoRef.current.pause();
+      const karaokeVideo = karaokeVideoRef.current;
+      const webcamVideo = webcamVideoRef.current;
+      const audioContext = audioContextRef.current;
+
+      if (karaokeVideo) {
+        karaokeVideo.pause();
       }
       
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.pause();
+      if (webcamVideo) {
+        webcamVideo.pause();
         
-        const tracks = (webcamVideoRef.current.srcObject as MediaStream)?.getTracks();
+        const tracks = (webcamVideo.srcObject as MediaStream)?.getTracks();
         tracks?.forEach((track) => track.stop());
       }
 
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(() => {});
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close().catch(() => {});
       }
     };
-  }, [karaokeSrc, router, songId, useSnapFilters, setWebcamElement, session]);
+  }, [karaokeSrc, logoLoaded]);
 
   // Charger directement un logo par défaut lors du premier render
   useEffect(() => {
@@ -564,7 +569,7 @@ function LiveKaraokeRecorderInner({
   // Fonction pour démarrer l'enregistrement
   const startRecording = async () => {
     if (!audioContextRef.current || !karaokeVideoRef.current || !mediaRecorderRef.current || !audioDestinationRef.current) {
-      setStatus("Le système n'est pas prêt");
+      console.error("Recording start failed: missing required refs");
       return;
     }
     
@@ -574,7 +579,6 @@ function LiveKaraokeRecorderInner({
     }
     
     try {
-      setStatus("Démarrage de l'enregistrement...");
       playingRef.current = true;
       
       // S'assurer que la vidéo est prête
@@ -688,7 +692,6 @@ function LiveKaraokeRecorderInner({
             console.warn("Première tentative de lecture vidéo échouée, nouvelle tentative...", e);
             await karaokeVideoRef.current!.play().catch(() => {
               console.warn("Second attempt also failed, continuing anyway");
-              // Continue anyway, the audio might still work
             });
           }
         }
@@ -701,7 +704,6 @@ function LiveKaraokeRecorderInner({
           console.warn("Audio playback failed, continuing anyway");
         });
         
-        setStatus("Enregistrement en cours");
       } catch (playError) {
         console.error("Erreur lors de la lecture:", playError);
         alert("Veuillez interagir avec la page pour autoriser la lecture audio");
@@ -709,7 +711,6 @@ function LiveKaraokeRecorderInner({
       }
     } catch (err) {
       console.error("Erreur au démarrage de l'enregistrement:", err);
-      setStatus(`Erreur: ${err instanceof Error ? err.message : "démarrage"}`);
       playingRef.current = false;
       
       // S'assurer que l'enregistrement est arrêté en cas d'erreur
@@ -777,23 +778,13 @@ function LiveKaraokeRecorderInner({
   };
 
   // Styles du bouton
-  const defaultButtonClassName = "mt-4 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform shadow-lg border border-white/10";
+  const defaultButtonClassName = "mt-4 text-white font-bold py-16 px-32 rounded-4xl transition-all duration-300 transform shadow-2xl border-2 border-white/30 text-5xl leading-tight";
   const buttonClassName = buttonStyles?.className || defaultButtonClassName;
-  const buttonText = buttonStyles?.text || "Préparez vous !";
+  const buttonText = buttonStyles?.text || "Cliquez ici pour\nlancer le karaoké";
   const buttonIcon = buttonStyles?.icon || "";
 
   return (
     <div className="w-full flex flex-col items-center justify-center">
-      {/* Debug information in development mode */}
-      {process.env.NODE_ENV !== 'production' && (
-        <div className="fixed top-0 left-0 bg-black/80 text-white p-2 text-xs z-50">
-          webcamRef: {webcamVideoRef.current ? '✓' : '✗'} | 
-          karaokeRef: {karaokeVideoRef.current ? '✓' : '✗'} | 
-          canvasRef: {canvasRef.current ? '✓' : '✗'} | 
-          CameraKit: {cameraKitReady ? '✓' : '✗'}
-        </div>
-      )}
-      
       {/* Vidéos cachées */}
       <video 
         ref={karaokeVideoRef} 
@@ -816,30 +807,15 @@ function LiveKaraokeRecorderInner({
         <div ref={cameraKitContainerRef}></div>
       </div>
       
-      {/* Supprimer la section du sélecteur de filtres Snapchat et ne garder que le bouton d'activation/désactivation */}
-      {isInitialized && (
-        <div className="mb-4 flex justify-center items-center w-full z-20">
-          <button
-            onClick={() => setUseSnapFilters(!useSnapFilters)}
-            className="text-white px-4 py-2 rounded-xl"
-            style={{ 
-              background: useSnapFilters ? 'var(--secondary-gradient)' : 'rgba(255,255,255,0.1)',
-              boxShadow: useSnapFilters ? '0 4px 10px rgba(0,0,0,0.2)' : 'none'
-            }}
-          >
-            {useSnapFilters ? 'Filtres activés ✓' : 'Filtres désactivés'}
-          </button>
-        </div>
-      )}
       
       {/* Canvas principal */}
-      <div className="w-full flex justify-center relative">
+      <div className="w-full h-full flex justify-center relative">
         <canvas 
           ref={canvasRef} 
-          className="w-full max-w-4xl rounded-lg shadow-lg" 
+          className="w-full h-full rounded-lg shadow-lg" 
           style={{ 
-            border: '2px solid', 
-            borderColor: 'var(--primary-color)'
+            maxHeight: '80vh',
+            objectFit: 'contain'
           }}
         />
 
@@ -856,14 +832,14 @@ function LiveKaraokeRecorderInner({
               }
               style={
                 webcamReady && karaokeReady && !playingRef.current
-                  ? { background: 'var(--secondary-gradient)' }
+                  ? { background: 'var(--secondary-gradient)', opacity: 0.9 }
                   : {}
               }
             >
-              <span className="flex items-center justify-center gap-2">
+              <span className="flex flex-col items-center justify-center gap-2">
                 {buttonIcon && <span className="mr-1">{buttonIcon}</span>}
                 <span className={webcamReady && karaokeReady && !playingRef.current ? "w-3 h-3 rounded-full bg-white animate-pulse" : "hidden"}></span>
-                {buttonText && <span>{buttonText}</span>}
+                {buttonText && <span className="whitespace-pre-line">{buttonText}</span>}
               </span>
             </button>
           </div>
@@ -878,16 +854,6 @@ function LiveKaraokeRecorderInner({
       </div>
       
       {/* Affichage du statut */}
-      <div 
-        className="mt-2 text-white p-2 rounded text-center w-full max-w-4xl mx-auto backdrop-blur-sm"
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          borderLeft: '3px solid var(--primary-color)',
-          borderRight: '3px solid var(--secondary-color)'
-        }}
-      >
-        {status}
-      </div>
       
       {/* Bouton "Arrêter l'enregistrement" */}
       {recordingStarted && !isProcessing && (
@@ -902,26 +868,6 @@ function LiveKaraokeRecorderInner({
             </svg>
             <span>Arrêter l&apos;enregistrement</span>
           </button>
-        </div>
-      )}
-      
-      {/* Indicateurs d'état */}
-      {!isProcessing && (
-        <div className="mt-4 text-sm flex flex-col items-center w-full max-w-4xl mx-auto">
-          <div className="flex space-x-4 justify-center">
-            <span className="px-3 py-1 rounded-full" style={{ 
-              backgroundColor: webcamReady ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.1)',
-              color: webcamReady ? 'white' : 'var(--text-muted)'
-            }}>
-              Webcam: {webcamReady ? "✅" : "❌"}
-            </span>
-            <span className="px-3 py-1 rounded-full" style={{ 
-              backgroundColor: karaokeReady ? 'var(--secondary-color)' : 'rgba(255, 255, 255, 0.1)',
-              color: karaokeReady ? 'white' : 'var(--text-muted)'
-            }}>
-              Vidéo: {karaokeReady ? "✅" : "❌"}
-            </span>
-          </div>
         </div>
       )}
     </div>
