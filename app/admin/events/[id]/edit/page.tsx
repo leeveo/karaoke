@@ -150,7 +150,9 @@ export default function EditEventPage() {
           let imageBlob: Blob | undefined;
           if (song.imageUrl) {
             try {
-              const imgResponse = await fetch(song.imageUrl);
+              // Use API proxy to avoid CORS issues
+              const proxyUrl = `/api/download-image?url=${encodeURIComponent(song.imageUrl)}`;
+              const imgResponse = await fetch(proxyUrl);
               if (imgResponse.ok) {
                 imageBlob = await imgResponse.blob();
                 totalSizeDownloaded += imageBlob.size;
