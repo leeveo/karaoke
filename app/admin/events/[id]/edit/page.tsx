@@ -16,7 +16,6 @@ export default function EditEventPage() {
   const [downloadedSongs, setDownloadedSongs] = useState(0);
   const [totalImages, setTotalImages] = useState(0);
   const [downloadedImages, setDownloadedImages] = useState(0);
-  const [totalSize, setTotalSize] = useState(0);
   const [downloadedSize, setDownloadedSize] = useState(0);
   const router = useRouter();
   const params = useParams();
@@ -305,7 +304,7 @@ export default function EditEventPage() {
         downloadedSongs={downloadedSongs}
         totalImages={totalImages}
         downloadedImages={downloadedImages}
-        totalSize={totalSize}
+        totalSize={0}
         downloadedSize={downloadedSize}
       />
     </div>

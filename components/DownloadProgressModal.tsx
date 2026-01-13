@@ -22,11 +22,14 @@ export default function DownloadProgressModal({
   downloadedSize
 }: DownloadProgressProps) {
   const [displaySize, setDisplaySize] = useState('0');
-  const [displayTotalSize, setDisplayTotalSize] = useState('0');
+  const [displayTotalSize, setDisplayTotalSize] = useState('En cours...');
 
   useEffect(() => {
     setDisplaySize((downloadedSize / 1024 / 1024).toFixed(2));
-    setDisplayTotalSize((totalSize / 1024 / 1024).toFixed(2));
+    // Only show total size if we have it, otherwise show "calculé à la fin"
+    if (totalSize > 0) {
+      setDisplayTotalSize((totalSize / 1024 / 1024).toFixed(2));
+    }
   }, [downloadedSize, totalSize]);
 
   const totalItems = totalSongs + totalImages;
