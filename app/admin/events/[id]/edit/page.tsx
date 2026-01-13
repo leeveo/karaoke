@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
+import DownloadProgressModal from '@/components/DownloadProgressModal';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
 import { Event, EventInput } from '@/types/event';
 
@@ -11,6 +12,12 @@ export default function EditEventPage() {
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [totalSongs, setTotalSongs] = useState(0);
+  const [downloadedSongs, setDownloadedSongs] = useState(0);
+  const [totalImages, setTotalImages] = useState(0);
+  const [downloadedImages, setDownloadedImages] = useState(0);
+  const [totalSize, setTotalSize] = useState(0);
+  const [downloadedSize, setDownloadedSize] = useState(0);
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -45,6 +52,9 @@ export default function EditEventPage() {
     try {
       setIsDownloading(true);
       setDownloadMessage(null);
+      setDownloadedSongs(0);
+      setDownloadedImages(0);
+      setDownloadedSize(0);
       
       console.log(`[Admin] Starting offline download for event: ${event.id}`);
       
@@ -64,7 +74,7 @@ export default function EditEventPage() {
         try {
           const songsResponse = await fetch(`/api/songs?action=songs&category=${category}`);
           if (!songsResponse.ok) continue;
-          const songs = await songsResponse.json();  // API retourne directement le tableau
+          const songs = await songsResponse.json();
           allSongs.push(...songs);
           console.log(`[Admin] Category ${category}: ${songs.length} songs`);
         } catch (err) {
@@ -72,7 +82,9 @@ export default function EditEventPage() {
         }
       }
       
-      console.log(`[Admin] Total songs downloaded: ${allSongs.length}`);
+      console.log(`[Admin] Total songs to download: ${allSongs.length}`);
+      setTotalSongs(allSongs.length);
+      setTotalImages(allSongs.length); // Estimation: une image par chanson
       
       // Store in IndexedDB
       const { initDB, storeOfflineEvent, storeOfflineSong } = await import('@/lib/offline/db');
@@ -98,6 +110,7 @@ export default function EditEventPage() {
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob();
             eventToStore.customization.logoBlob = logoBlob;
+            setDownloadedSize(prev => prev + logoBlob.size);
             console.log(`[Admin] Logo downloaded: ${(logoBlob.size / 1024).toFixed(2)} KB`);
           }
         } catch (err) {
@@ -112,6 +125,7 @@ export default function EditEventPage() {
           if (bgResponse.ok) {
             const bgBlob = await bgResponse.blob();
             eventToStore.customization.backgroundImageBlob = bgBlob;
+            setDownloadedSize(prev => prev + bgBlob.size);
             console.log(`[Admin] Background image downloaded: ${(bgBlob.size / 1024 / 1024).toFixed(2)} MB`);
           }
         } catch (err) {
@@ -124,6 +138,7 @@ export default function EditEventPage() {
       
       // Store all songs with images
       let successCount = 0;
+      let imagesDownloaded = 0;
       let totalSizeDownloaded = 0;
       
       for (const song of allSongs) {
@@ -145,6 +160,7 @@ export default function EditEventPage() {
           }
           const blob = await songResponse.blob();
           totalSizeDownloaded += blob.size;
+          setDownloadedSize(prev => prev + blob.size);
           
           // Download song image if available
           let imageBlob: Blob | undefined;
@@ -156,6 +172,9 @@ export default function EditEventPage() {
               if (imgResponse.ok) {
                 imageBlob = await imgResponse.blob();
                 totalSizeDownloaded += imageBlob.size;
+                setDownloadedSize(prev => prev + imageBlob.size);
+                imagesDownloaded++;
+                setDownloadedImages(imagesDownloaded);
                 console.log(`[Admin] Song image downloaded: ${song.title}`);
               }
             } catch (err) {
@@ -176,6 +195,7 @@ export default function EditEventPage() {
           });
           
           successCount++;
+          setDownloadedSongs(successCount);
           console.log(`[Admin] Song stored: ${song.title} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
         } catch (err) {
           console.warn(`[Admin] Failed to download song ${song.key}:`, err);
@@ -185,7 +205,7 @@ export default function EditEventPage() {
       const totalSizeMB = (totalSizeDownloaded / 1024 / 1024).toFixed(2);
       setDownloadMessage({
         type: 'success',
-        text: `✅ ${event.name} téléchargé pour utilisation hors ligne! (${successCount}/${allSongs.length} chansons + images - ${totalSizeMB}MB)`,
+        text: `✅ ${event.name} téléchargé pour utilisation hors ligne! (${successCount}/${allSongs.length} chansons + ${imagesDownloaded} images - ${totalSizeMB}MB)`,
       });
       
       console.log(`[Admin] Successfully downloaded event: ${event.id}`);
@@ -277,6 +297,17 @@ export default function EditEventPage() {
         )}
       </div>
       <EventForm onSubmit={handleSubmit} initialData={prepareFormData(event!)} />
+      
+      {/* Download Progress Modal */}
+      <DownloadProgressModal
+        isVisible={isDownloading}
+        totalSongs={totalSongs}
+        downloadedSongs={downloadedSongs}
+        totalImages={totalImages}
+        downloadedImages={downloadedImages}
+        totalSize={totalSize}
+        downloadedSize={downloadedSize}
+      />
     </div>
   );
 }
