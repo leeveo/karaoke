@@ -29,6 +29,7 @@ interface Song {
   size?: number;
   lastModified?: Date;
   imageUrl?: string;
+  categoryId?: string;
 }
 
 function parseFileName(fileName: string): { title: string; artist: string } {
@@ -152,7 +153,8 @@ export async function GET(request: NextRequest) {
             artist,
             size: fileData.video.Size,
             lastModified: fileData.video.LastModified,
-            imageUrl: fileData.image
+            imageUrl: fileData.image,
+            categoryId: category
           });
         }
       }
