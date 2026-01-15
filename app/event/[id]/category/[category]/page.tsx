@@ -158,10 +158,17 @@ export default function EventCategoryPage() {
         if (typeof category === 'string') {
           const s3FolderCategory = mapCategoryToS3Folder(category);
           
-          // Try online first
+          // Try online first (with timeout)
           if (navigator.onLine) {
             try {
-              const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(s3FolderCategory)}`);
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(s3FolderCategory)}`, {
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
               
               if (!response.ok) {
                 throw new Error('Failed to fetch songs');
@@ -194,12 +201,38 @@ export default function EventCategoryPage() {
             setSongs(formattedSongs);
             setError(null);
           } else {
+            console.warn('[CategoryPage] Pas de chansons trouvées en offline');
             setError('Aucune chanson disponible (Besoin d\'internet pour charger ou télécharger des chansons)');
           }
         }
         setIsLoading(false);
       } catch (err) {
         console.error('Erreur lors du chargement des chansons:', err);
+        
+        // Essayer quand même le fallback offline
+        try {
+          if (typeof category === 'string') {
+            const s3FolderCategory = mapCategoryToS3Folder(category);
+            const offlineSongs = await loadOfflineSongsByCategory(s3FolderCategory);
+            
+            if (offlineSongs && offlineSongs.length > 0) {
+              const formattedSongs = offlineSongs.map(s => ({
+                key: s.key,
+                title: s.title || s.key,
+                artist: s.artist || 'Unknown',
+                size: s.size,
+                imageUrl: s.imageUrl
+              })) as Song[];
+              setSongs(formattedSongs);
+              setError(null);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (offlineErr) {
+          console.error('Fallback offline aussi échoué:', offlineErr);
+        }
+        
         setError('Impossible de charger les chansons. Vérifiez votre connexion ou téléchargez des chansons en offline.');
         setIsLoading(false);
       }
