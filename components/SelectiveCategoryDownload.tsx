@@ -30,7 +30,7 @@ export default function SelectiveCategoryDownload({
     if (isOpen && Object.keys(categories).length === 0) {
       fetchCategoriesInfo();
     }
-  }, [isOpen]);
+  }, [isOpen, categories]);
 
   const fetchCategoriesInfo = async () => {
     try {

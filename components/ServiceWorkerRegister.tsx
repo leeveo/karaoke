@@ -7,7 +7,7 @@ export default function ServiceWorkerRegister() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       // Unregister existing ServiceWorkers first to avoid conflicts
       navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (let registration of registrations) {
+        for (const registration of registrations) {
           registration.unregister();
           console.log('[SW] Unregistered existing ServiceWorker');
         }
