@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import CategorySelector from '@/components/CategorySelector';
-import { OfflineDownloadButton } from '@/components/OfflineDownloadButton';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import Image from 'next/image';
@@ -269,12 +268,6 @@ function EventPageContent() {
           >
             Choisissez votre catégorie
           </h2>
-          {/* Offline Download Button */}
-          {event && (
-            <div className="flex justify-center mb-4">
-              <OfflineDownloadButton event={event} className="max-w-md" />
-            </div>
-          )}
         </div>
       </div>
       <div className="relative z-10 w-full">

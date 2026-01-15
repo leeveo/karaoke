@@ -123,9 +123,6 @@ async function cacheFirstStrategy(request) {
     });
   }
 }
-    });
-  }
-}
 
 /**
  * Message handler for client communication
