@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import EventForm from '@/components/forms/EventForm';
 import DownloadProgressModal from '@/components/DownloadProgressModal';
+import SelectiveCategoryDownload from '@/components/SelectiveCategoryDownload';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
 import { Event, EventInput } from '@/types/event';
 
@@ -17,6 +18,7 @@ export default function EditEventPage() {
   const [totalImages, setTotalImages] = useState(0);
   const [downloadedImages, setDownloadedImages] = useState(0);
   const [downloadedSize, setDownloadedSize] = useState(0);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -45,7 +47,12 @@ export default function EditEventPage() {
     }
   };
 
-  const handleDownloadOffline = async () => {
+  const handleCategorySelection = async (selectedCategories: string[]) => {
+    setShowCategorySelector(false);
+    await handleDownloadOffline(selectedCategories);
+  };
+
+  const handleDownloadOffline = async (categoriesToDownload?: string[]) => {
     if (!event) return;
     
     try {
@@ -63,13 +70,18 @@ export default function EditEventPage() {
       if (!categoriesResponse.ok) {
         throw new Error('Failed to fetch categories');
       }
-      const categories = await categoriesResponse.json();
+      const allCategories = await categoriesResponse.json();
       
-      console.log(`[Admin] Found ${categories.length} categories:`, categories);
+      // Utiliser les catégories sélectionnées ou toutes les catégories
+      const categoriesToFetch = categoriesToDownload && categoriesToDownload.length > 0 
+        ? categoriesToDownload 
+        : allCategories;
       
-      // Fetch all songs from all categories
+      console.log(`[Admin] Found ${allCategories.length} categories, downloading: ${categoriesToFetch.length}`);
+      
+      // Fetch all songs from selected categories
       const allSongs = [];
-      for (const category of categories) {
+      for (const category of categoriesToFetch) {
         try {
           const songsResponse = await fetch(`/api/songs?action=songs&category=${category}`);
           if (!songsResponse.ok) continue;
@@ -262,7 +274,7 @@ export default function EditEventPage() {
         {event && (
           <div className="flex flex-col gap-2">
             <button
-              onClick={handleDownloadOffline}
+              onClick={() => setShowCategorySelector(true)}
               disabled={isDownloading}
               className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
                 isDownloading
@@ -296,6 +308,14 @@ export default function EditEventPage() {
         )}
       </div>
       <EventForm onSubmit={handleSubmit} initialData={prepareFormData(event!)} />
+      
+      {/* Category Selector Modal */}
+      <SelectiveCategoryDownload
+        isOpen={showCategorySelector}
+        onClose={() => setShowCategorySelector(false)}
+        onConfirm={handleCategorySelection}
+        isLoading={isDownloading}
+      />
       
       {/* Download Progress Modal */}
       <DownloadProgressModal
