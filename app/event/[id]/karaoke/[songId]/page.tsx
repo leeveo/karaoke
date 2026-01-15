@@ -29,9 +29,19 @@ export default function EventKaraokePage() {
   // "Retour" button handler - Make sure to include the event ID
   const handleReturn = () => {
     if (id) {
-      router.push(`/event/${id}`);
+      // En hors ligne, utiliser MPA navigation pour éviter les erreurs RSC
+      if (!navigator.onLine) {
+        window.location.href = `/event/${id}`;
+      } else {
+        router.push(`/event/${id}`);
+      }
     } else {
-      router.push('/'); // Fallback to home if no ID
+      // Fallback to home if no ID
+      if (!navigator.onLine) {
+        window.location.href = '/';
+      } else {
+        router.push('/');
+      }
     }
   };
 

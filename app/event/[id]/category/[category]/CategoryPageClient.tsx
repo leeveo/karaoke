@@ -298,7 +298,15 @@ export default function EventCategoryPageClient({
     
     // Temporiser la navigation pour montrer le loader
     setTimeout(() => {
-      router.push(`/event/${id}/karaoke/${encodeURIComponent(songKey)}`);
+      // En hors ligne, utiliser une navigation MPA (page reload) au lieu de RSC navigation
+      // qui essayerait de charger le RSC payload du serveur et échouerait offline
+      if (!navigator.onLine) {
+        console.warn('[CategoryPage] Offline detected - using MPA navigation instead of RSC');
+        window.location.href = `/event/${id}/karaoke/${encodeURIComponent(songKey)}`;
+      } else {
+        // Online: utiliser la navigation RSC optimale
+        router.push(`/event/${id}/karaoke/${encodeURIComponent(songKey)}`);
+      }
     }, 800); // Délai pour voir l'animation
   };
 
@@ -317,7 +325,13 @@ export default function EventCategoryPageClient({
         <h2 className="text-2xl font-bold text-white mb-4">Erreur</h2>
         <p className="text-white">{error}</p>
         <button 
-          onClick={() => router.push(`/event/${id}`)}
+          onClick={() => {
+            if (!navigator.onLine) {
+              window.location.href = `/event/${id}`;
+            } else {
+              router.push(`/event/${id}`);
+            }
+          }}
           className="mt-6 px-6 py-2 bg-white text-red-600 rounded-lg font-medium"
         >
           Retour événement
@@ -565,7 +579,13 @@ export default function EventCategoryPageClient({
             {/* Back button */}
             <div className="mb-6 text-center">
               <button
-                onClick={() => router.push(`/event/${id}`)}
+                onClick={() => {
+                  if (!navigator.onLine) {
+                    window.location.href = `/event/${id}`;
+                  } else {
+                    router.push(`/event/${id}`);
+                  }
+                }}
                 className="py-3 px-6 rounded-lg transition-all flex items-center gap-2 mx-auto text-white hover:translate-y-[-2px] hover:shadow-xl"
                 style={{ 
                   backgroundColor: 'var(--primary-color-75)',
