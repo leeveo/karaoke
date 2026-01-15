@@ -76,7 +76,8 @@ async function networkFirstStrategy(request) {
   try {
     const response = await fetch(request);
 
-    if (response.ok) {
+    // Only cache GET requests with successful responses
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
@@ -108,7 +109,8 @@ async function cacheFirstStrategy(request) {
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    // Only cache GET requests with successful responses
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
@@ -118,6 +120,9 @@ async function cacheFirstStrategy(request) {
     return new Response('Offline - Resource not available', {
       status: 503,
       statusText: 'Service Unavailable',
+    });
+  }
+}
     });
   }
 }
