@@ -114,15 +114,15 @@ export default function SelectiveCategoryDownload({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white shrink-0">
               <h2 className="text-2xl font-bold">Sélectionner les catégories</h2>
               <p className="text-blue-100 mt-2">Téléchargez uniquement les catégories que vous souhaitez</p>
             </div>
 
-            {/* Content */}
+            {/* Content - Scrollable */}
             <div className="flex-1 overflow-y-auto p-6">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
@@ -138,7 +138,7 @@ export default function SelectiveCategoryDownload({
               ) : (
                 <div className="space-y-4">
                   {/* Select All */}
-                  <div className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
+                  <div className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors mb-6"
                     onClick={toggleAll}>
                     <div className="flex items-center gap-3">
                       <input
@@ -156,46 +156,48 @@ export default function SelectiveCategoryDownload({
                     </div>
                   </div>
 
-                  {/* Categories */}
-                  {Object.entries(categories).map(([key, cat]) => (
-                    <div
-                      key={key}
-                      className="border-2 border-gray-200 p-4 rounded-lg cursor-pointer hover:border-blue-400 transition-colors hover:bg-blue-50"
-                      onClick={() => toggleCategory(key)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={cat.selected}
-                          onChange={() => {}}
-                          className="w-5 h-5 mt-1 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-gray-800">{cat.name}</h3>
-                            <span className="text-sm font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                              {cat.songCount} chanson{cat.songCount > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                            <span>📊 Taille estimée: <strong>{cat.estimatedSize} MB</strong></span>
-                          </div>
-                          <div className="mt-2 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all"
-                              style={{ width: `${Math.min((cat.estimatedSize / 100) * 100, 100)}%` }}
-                            ></div>
+                  {/* Categories Grid - 2 columns */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(categories).map(([key, cat]) => (
+                      <div
+                        key={key}
+                        className="border-2 border-gray-200 p-4 rounded-lg cursor-pointer hover:border-blue-400 transition-colors hover:bg-blue-50"
+                        onClick={() => toggleCategory(key)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={cat.selected}
+                            onChange={() => {}}
+                            className="w-5 h-5 mt-1 cursor-pointer flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-800 break-words">{cat.name}</h3>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
+                              <span className="font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded whitespace-nowrap">
+                                {cat.songCount} chanson{cat.songCount > 1 ? 's' : ''}
+                              </span>
+                              <span className="font-medium">
+                                {cat.estimatedSize} MB
+                              </span>
+                            </div>
+                            <div className="mt-3 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all"
+                                style={{ width: `${Math.min((cat.estimatedSize / 100) * 100, 100)}%` }}
+                              ></div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Footer Summary */}
-            <div className="border-t border-gray-200 bg-gray-50 p-6">
+            {/* Footer Summary - Fixed */}
+            <div className="border-t border-gray-200 bg-gray-50 p-6 shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-600">Catégories sélectionnées: <strong>{selectedCategories.length}</strong></p>
