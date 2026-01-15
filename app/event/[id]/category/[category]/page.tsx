@@ -156,7 +156,9 @@ export default function EventCategoryPage() {
         // Use local state instead of global loader
         setIsLoading(true);
         if (typeof category === 'string') {
+          console.log(`[CategoryPage] Fetching songs for category: ${category}`);
           const s3FolderCategory = mapCategoryToS3Folder(category);
+          console.log(`[CategoryPage] Mapped to S3 folder: ${s3FolderCategory}`);
           
           // Try online first (with timeout)
           if (navigator.onLine) {
