@@ -30,7 +30,7 @@ export default function LoginPage() {
         <div className="max-w-md mx-auto">
           {/* Main Login Card */}
           <motion.div 
-            className="backdrop-blur-2xl bg-white/10 rounded-3xl shadow-2xl border border-white/20 overflow-hidden hover:border-white/30 transition-all duration-300"
+            className="backdrop-blur-3xl bg-white/15 rounded-3xl shadow-2xl border border-white/30 overflow-hidden hover:border-white/40 transition-all duration-300"
             initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -40,7 +40,7 @@ export default function LoginPage() {
             <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
 
             {/* Card Content */}
-            <div className="p-8 sm:p-10">
+            <div className="p-8 sm:p-10 bg-white/5 backdrop-blur-xl">
               {/* Logo Section */}
               <motion.div 
                 className="flex flex-col items-center mb-8"
