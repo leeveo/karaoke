@@ -155,7 +155,7 @@ export class CacheManager {
   /**
    * Message Service Worker to clear a specific cache
    */
-  static async messageServiceWorker(type: string, data: any = {}): Promise<any> {
+  static async messageServiceWorker(type: string, data: Record<string, unknown> = {}): Promise<unknown> {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       return new Promise((resolve) => {
         const channel = new MessageChannel();
@@ -193,7 +193,7 @@ export class CacheManager {
       const videosCache = await caches.open(this.VIDEOS_CACHE);
       response = await videosCache.match(url);
       return !!response;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

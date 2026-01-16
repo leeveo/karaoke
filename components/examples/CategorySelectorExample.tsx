@@ -21,7 +21,6 @@ interface CategorySelectorExampleProps {
 }
 
 export function CategorySelectorExample({ categories }: CategorySelectorExampleProps) {
-  const [loading, setLoading] = useState(true);
   const [prefetchProgress, setPrefetchProgress] = useState(0);
 
   // Extract image URLs for prefetching
@@ -43,7 +42,6 @@ export function CategorySelectorExample({ categories }: CategorySelectorExampleP
     };
 
     const interval = setInterval(checkCacheProgress, 500);
-    setLoading(false);
     return () => clearInterval(interval);
   }, [imageUrls]);
 
