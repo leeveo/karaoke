@@ -52,7 +52,7 @@ export default function LoginForm() {
   return (
     <motion.form 
       onSubmit={handleLogin}
-      className="space-y-6"
+      className="space-y-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.5 }}
@@ -80,11 +80,11 @@ export default function LoginForm() {
         </motion.div>
       )}
       
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium text-gray-200">Adresse email</label>
+      <div className="space-y-4">
+        <label htmlFor="email" className="text-sm font-medium text-gray-800">Adresse email</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <FiMail className="text-gray-400" />
+            <FiMail className="text-gray-500" />
           </div>
           <input
             id="email"
@@ -94,18 +94,18 @@ export default function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2.5 text-gray-800 bg-white bg-opacity-90 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            className="block w-full pl-10 pr-3 py-2.5 text-gray-800 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="admin@example.com"
             disabled={isLoading || success}
           />
         </div>
       </div>
       
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium text-gray-200">Mot de passe</label>
+      <div className="space-y-4">
+        <label htmlFor="password" className="text-sm font-medium text-gray-800">Mot de passe</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <FiLock className="text-gray-400" />
+            <FiLock className="text-gray-500" />
           </div>
           <input
             id="password"
@@ -115,34 +115,34 @@ export default function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2.5 text-gray-800 bg-white bg-opacity-90 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            className="block w-full pl-10 pr-3 py-2.5 text-gray-800 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="••••••••"
             disabled={isLoading || success}
           />
         </div>
       </div>
       
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pt-2">
         <div className="flex items-center">
           <input
             id="remember-me"
             name="remember-me"
             type="checkbox"
-            className="h-4 w-4 rounded border-gray-300"
+            className="h-4 w-4 rounded border-gray-400"
           />
-          <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-300">
+          <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
             Se souvenir de moi
           </label>
         </div>
         
         <div className="text-sm">
-          <a href="#" className="text-blue-400 hover:text-blue-300">
+          <a href="#" className="text-blue-600 hover:text-blue-700">
             Mot de passe oublié?
           </a>
         </div>
       </div>
       
-      <div>
+      <div className="mt-8">
         <button
           type="submit"
           disabled={isLoading || success}
