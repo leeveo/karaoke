@@ -3,9 +3,9 @@
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import { useEffect, useState } from 'react';
-import { fetchEventById } from '@/lib/supabase/events';
 import { Event as EventType } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
+import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
+import { pendingEmailStore } from '@/lib/offline/pendingEmailStore';
 
 export default function EventQRPage() {
   const searchParams = useSearchParams();
@@ -13,60 +13,67 @@ export default function EventQRPage() {
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<EventType | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
   const router = useRouter();
   
+  // Détecter si on est online ou offline
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Charger l'événement et ses personnalisations
   useEffect(() => {
     async function loadEvent() {
+      if (typeof id !== 'string') {
+        return;
+      }
+
       try {
-        if (typeof id === 'string') {
-          const eventData = await fetchEventById(id);
-          setEvent(eventData);
-          
-          // Appliquer les couleurs personnalisées
-          if (eventData.customization) {
-            document.documentElement.style.setProperty('--primary-color', eventData.customization.primary_color);
-            document.documentElement.style.setProperty('--primary-light', adjustColorLightness(eventData.customization.primary_color, 20));
-            document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(eventData.customization.primary_color, -20));
-            document.documentElement.style.setProperty('--secondary-color', eventData.customization.secondary_color);
-            document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(eventData.customization.secondary_color, 20));
-            document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(eventData.customization.secondary_color, -20));
-            
-            // Configurer les gradients
-            document.documentElement.style.setProperty(
-              '--primary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.primary_color} 0%, ${adjustColorLightness(eventData.customization.primary_color, 20)} 100%)`
-            );
-            document.documentElement.style.setProperty(
-              '--secondary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.secondary_color} 0%, ${adjustColorLightness(eventData.customization.secondary_color, 20)} 100%)`
-            );
-            
-            // Charger l'image de fond
-            if (eventData.customization.background_image) {
-              try {
-                // Construire l'URL complète à partir du nom du fichier stocké dans la base
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-              
-                if (publicUrlResult.data?.publicUrl) {
-                  eventData.customization.backgroundImageUrl = publicUrlResult.data.publicUrl;
-                  console.log("Image de fond chargée:", publicUrlResult.data.publicUrl);
-                } else {
-                  console.error("URL publique non disponible pour l'image:", eventData.customization.background_image);
-                }
-              } catch (error) {
-                console.error("Erreur lors de la récupération de l'URL de l'image:", error);
-              }
-            }
-          }
+        const eventData = await loadEventWithOfflineFallback(id);
+        if (!eventData) {
+          return;
         }
+
+        setEvent(eventData);
+
+        if (!eventData.customization) {
+          return;
+        }
+
+        const primaryColor = eventData.customization.primary_color || '#0334b9';
+        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
+        document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
+        document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+        document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
+        document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
+
+        document.documentElement.style.setProperty(
+          '--primary-gradient',
+          `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColorLightness(primaryColor, 20)} 100%)`
+        );
+        document.documentElement.style.setProperty(
+          '--secondary-gradient',
+          `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
+        );
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
       }
     }
-    
+
     loadEvent();
   }, [id]);
 
@@ -190,26 +197,42 @@ export default function EventQRPage() {
     if (showForm) {
       // Attendre que le DOM soit mis à jour et rendu
       const timer = setTimeout(() => {
+        // Essayer d'ouvrir le clavier pour le champ email d'abord (plus critique)
+        const emailInput = document.getElementById('email') as HTMLInputElement;
         const nameInput = document.getElementById('name') as HTMLInputElement;
-        if (nameInput) {
+        
+        const inputToFocus = emailInput || nameInput;
+        
+        if (inputToFocus) {
           // Assurez-vous que l'input est visible
-          nameInput.scrollIntoView({ behavior: 'auto', block: 'center' });
+          inputToFocus.scrollIntoView({ behavior: 'smooth', block: 'center' });
           
-          // Force le focus multiple fois pour s'assurer que le clavier apparaît
-          nameInput.focus();
-          nameInput.focus();
+          // Force le focus plusieurs fois pour s'assurer que le clavier apparaît
+          inputToFocus.focus();
+          inputToFocus.focus();
           
           // Sélectionner le texte (attire l'attention du système)
-          nameInput.select();
+          inputToFocus.select();
           
           // Simuler des événements utilisateur
-          nameInput.dispatchEvent(new Event('focus', { bubbles: true }));
-          nameInput.dispatchEvent(new Event('click', { bubbles: true }));
+          inputToFocus.dispatchEvent(new Event('focus', { bubbles: true }));
+          inputToFocus.dispatchEvent(new Event('click', { bubbles: true }));
+          inputToFocus.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }));
           
           // Pour iOS, essayer de déclencher le clavier une autre fois
           setTimeout(() => {
-            nameInput.focus();
-          }, 200);
+            if (inputToFocus) {
+              inputToFocus.focus();
+              inputToFocus.click();
+            }
+          }, 100);
+          
+          // Un dernier essai avec délai plus long pour les appareils lents
+          setTimeout(() => {
+            if (inputToFocus) {
+              inputToFocus.focus();
+            }
+          }, 500);
         }
       }, 50);
       return () => clearTimeout(timer);
@@ -288,6 +311,8 @@ export default function EventQRPage() {
   // Fonction pour envoyer l'email via notre API
   const sendEmail = async (videoUrl?: string) => {
     try {
+      const finalUrl = videoUrl || pageUrl;
+
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -298,7 +323,7 @@ export default function EventQRPage() {
           email: formData.email,
           subject: formData.subject,
           message: formData.message,
-          videoUrl: videoUrl || pageUrl,
+          videoUrl: finalUrl,
           sessionId: sessionId,
           eventId: id
         }),
@@ -321,7 +346,8 @@ export default function EventQRPage() {
     e.preventDefault();
     console.log('✓ handleSubmit called - form submitted');
     console.log('✓ pageUrl:', pageUrl);
-    console.log('✓ pageUrl includes s3?', pageUrl?.includes('s3.amazonaws.com'));
+    console.log('✓ isOnline:', isOnline);
+    console.log('✓ pageUrl includes blob?', pageUrl?.startsWith('blob:'));
     
     // Validation des champs
     if (!formData.name.trim()) {
@@ -344,6 +370,55 @@ export default function EventQRPage() {
     
     setFormError('');
     setIsSubmitting(true);
+    
+    // Si offline et blob URL, sauvegarder en IndexedDB
+    if (!isOnline && pageUrl?.startsWith('blob:')) {
+      console.log('✓ Offline mode detected - saving to IndexedDB');
+      try {
+        // Convertir blob URL en Blob
+        const response = await fetch(pageUrl);
+        const blob = await response.blob();
+
+        // Sauvegarder en IndexedDB
+        const sessionIdStr = Array.isArray(sessionId) ? sessionId[0] : sessionId;
+        const eventIdStr = Array.isArray(id) ? id[0] : id;
+        
+        const pendingEmail = {
+          id: `${sessionIdStr}-${Date.now()}`,
+          videoBlob: blob,
+          email: formData.email,
+          name: formData.name,
+          subject: formData.subject,
+          message: formData.message,
+          sessionId: sessionIdStr,
+          eventId: eventIdStr,
+          createdAt: Date.now(),
+          retries: 0
+        };
+        
+        await pendingEmailStore.savePendingEmail(pendingEmail);
+        console.log('✓ Email saved offline:', pendingEmail.id);
+
+        // Afficher le pop-up de succès
+        setSuccessMessage('Vidéo sauvegardée! Elle sera envoyée par email dès que vous serez de retour en ligne.');
+        setShowSuccessPopup(true);
+
+        // Fermer automatiquement le pop-up après 3 secondes
+        setTimeout(() => {
+          setShowSuccessPopup(false);
+        }, 3000);
+
+        // Fermer le formulaire
+        setShowForm(false);
+        setIsSubmitting(false);
+        return;
+      } catch (error) {
+        console.error('✗ Error saving offline:', error);
+        setFormError('Erreur lors de la sauvegarde offline');
+        setIsSubmitting(false);
+        return;
+      }
+    }
     
     let videoUrlForEmail = pageUrl; // Default to original URL
     
@@ -441,6 +516,171 @@ export default function EventQRPage() {
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
           <p className="text-white/60 mt-2">Veuillez patienter </p>
          
+        </div>
+      </div>
+    );
+  }
+
+  // Mode offline: afficher JUSTE le formulaire d'email, pas le QR
+  if (!isOnline && pageUrl?.startsWith('blob:')) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
+          style={{
+            backgroundImage: event?.customization?.backgroundImageUrl 
+              ? `url('${event.customization.backgroundImageUrl}')` 
+              : "url('/bg.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundAttachment: "fixed"
+          }}>
+        {/* Overlay léger pour améliorer la lisibilité */}
+        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        
+        {/* Contenu principal - Formulaire offline */}
+        <div className="z-10 w-full max-w-2xl flex flex-col items-center">
+          <div className="bg-white rounded-lg shadow-2xl w-full"
+            style={{
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+            }}
+          >
+            <div className="p-8">
+              <div className="mb-6 p-4 rounded-lg"
+                style={{ 
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  borderLeft: '4px solid var(--secondary-color)',
+                }}
+              >
+                <p className="text-sm font-semibold text-yellow-800">
+                  📡 Mode hors-ligne détecté - Votre vidéo sera envoyée dès que vous serez de retour en ligne
+                </p>
+              </div>
+
+              <h2 
+                className="text-3xl font-bold mb-6 text-center"
+                style={{ color: 'var(--primary-color)' }}
+              >
+                Partagez votre performance
+              </h2>
+
+              {formError && (
+                <div className="p-4 rounded mb-6"
+                  style={{ 
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+                    borderLeft: '3px solid var(--secondary-color)',
+                    color: '#9f1239'
+                  }}
+                >
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="name" className="block text-lg font-medium text-gray-700 mb-2">
+                    Votre nom
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    autoFocus
+                    inputMode="text"
+                    className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
+                    style={{ 
+                      borderColor: formData.name ? 'var(--primary-color)' : 'rgba(139, 92, 246, 0.3)',
+                    }}
+                    placeholder="Entrez votre nom"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-lg font-medium text-gray-700 mb-2">
+                    Votre email
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    inputMode="email"
+                    className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
+                    style={{ 
+                      borderColor: formData.email ? 'var(--primary-color)' : 'rgba(139, 92, 246, 0.3)',
+                    }}
+                    placeholder="votre@email.com"
+                  />
+                </div>
+
+                <div className="flex items-start">
+                  <div className="flex items-center h-6">
+                    <input
+                      id="rgpdConsent"
+                      name="rgpdConsent"
+                      type="checkbox"
+                      checked={formData.rgpdConsent}
+                      onChange={handleChange}
+                      className="h-5 w-5 rounded border-gray-300"
+                      style={{ color: 'var(--primary-color)' }}
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="rgpdConsent" className="font-medium text-gray-700 text-base">
+                     Accepter les conditions RGPD
+                    </label>
+                    <p className="text-gray-500 text-sm mt-1">
+                      En cochant cette case, vous acceptez que nous utilisions vos données personnelles pour vous contacter à propos de votre performance karaoké. Vos données ne seront pas partagées avec des tiers.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-md text-base"
+                  style={{ 
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    color: 'var(--primary-dark)'
+                  }}
+                >
+                  <p>Votre vidéo et vos informations seront sauvegardées localement et envoyées par email dès que votre connexion sera rétablie.</p>
+                </div>
+
+                <div className="flex flex-col gap-4 mt-8">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="text-white px-8 py-4 rounded-lg transition-all duration-300 flex justify-center w-full font-bold text-xl"
+                    style={{ 
+                      background: isSubmitting 
+                        ? 'var(--primary-gradient)' 
+                        : 'var(--secondary-gradient)',
+                      opacity: isSubmitting ? 0.7 : 1,
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 10px rgba(236, 72, 153, 0.3)'
+                    }}
+                  >
+                    {isSubmitting ? 'Sauvegarde en cours...' : 'Sauvegarder et partager par email'}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      router.push(`/event/${id}`);
+                    }}
+                    className="px-8 py-4 rounded-lg transition-all duration-300 w-full font-bold text-xl"
+                    style={{ 
+                      background: 'var(--primary-gradient)',
+                      color: 'white',
+                      boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
+                    }}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:offline-package": "node scripts/build-offline-package.js",
+    "kiosk:build": "node scripts/kiosk-build.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.812.0",
@@ -32,7 +34,9 @@
     "react-icons": "^5.5.0",
     "swiper": "^12.0.3",
     "uuid": "^11.1.0",
-    "workbox-window": "^7.0.0"
+    "workbox-window": "^7.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

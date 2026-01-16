@@ -3,9 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { uploadToS3 } from '@/lib/aws';
-import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
+import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader';  // Ajout de l'import du loader
 
 export default function EventReviewPage() {
@@ -25,57 +24,45 @@ export default function EventReviewPage() {
   // Charger l'événement et ses personnalisations
   useEffect(() => {
     async function loadEvent() {
+      if (typeof id !== 'string') {
+        return;
+      }
+
       try {
-        if (typeof id === 'string') {
-          const eventData = await fetchEventById(id);
-          setEvent(eventData);
-          
-          // Appliquer les couleurs personnalisées
-          if (eventData.customization) {
-            // Couleurs primaires et secondaires
-            document.documentElement.style.setProperty('--primary-color', eventData.customization.primary_color);
-            document.documentElement.style.setProperty('--primary-light', adjustColorLightness(eventData.customization.primary_color, 20));
-            document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(eventData.customization.primary_color, -20));
-            document.documentElement.style.setProperty('--secondary-color', eventData.customization.secondary_color);
-            document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(eventData.customization.secondary_color, 20));
-            document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(eventData.customization.secondary_color, -20));
-            
-            // Gradients
-            document.documentElement.style.setProperty(
-              '--primary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.primary_color} 0%, ${adjustColorLightness(eventData.customization.primary_color, 20)} 100%)`
-            );
-            document.documentElement.style.setProperty(
-              '--secondary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.secondary_color} 0%, ${adjustColorLightness(eventData.customization.secondary_color, 20)} 100%)`
-            );
-            
-            // Handle background image properly
-            if (eventData.customization.background_image) {
-              try {
-                // Get public URL from Supabase storage
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  console.log("Background image loaded:", bgUrl);
-                } else {
-                  console.error("Public URL not available for image:", eventData.customization.background_image);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-              }
-            }
-          }
+        const eventData = await loadEventWithOfflineFallback(id);
+        if (!eventData) {
+          return;
         }
+
+        setEvent(eventData);
+
+        if (!eventData.customization) {
+          return;
+        }
+
+        const primaryColor = eventData.customization.primary_color || '#0334b9';
+        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
+        document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
+        document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+        document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
+        document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
+
+        document.documentElement.style.setProperty(
+          '--primary-gradient',
+          `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColorLightness(primaryColor, 20)} 100%)`
+        );
+        document.documentElement.style.setProperty(
+          '--secondary-gradient',
+          `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
+        );
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
       }
     }
-    
+
     loadEvent();
   }, [id]);
 
@@ -147,49 +134,70 @@ export default function EventReviewPage() {
       setUploadStep("Préparation de votre vidéo...");
       setUploadProgress(10);
       
+      // Vérifier si on est en ligne
+      const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : false;
+      console.log('[Review] Online status:', isOnline);
+      
       // Use the raw video URL from the recording which should already have the logo embedded
       const tempLocalUrl = videoUrl;
       sessionStorage.setItem('video-local-url', tempLocalUrl);
       
-      setUploadStep("Téléchargement de votre vidéo...");
-      setUploadProgress(25);
+      let finalVideoUrl = tempLocalUrl;
       
-      // Fetch the video blob directly - this should contain the logo already embedded
-      // because it was drawn on the canvas during recording
-      const response = await fetch(videoUrl);
-      const blob = await response.blob();
-      
-      // Nouveau format de nom de fichier qui inclut l'ID de l'événement
-      const filename = `karaoke-videos/event_${id}/${sessionId}-${Date.now()}.webm`;
+      if (isOnline) {
+        setUploadStep("Téléchargement de votre vidéo...");
+        setUploadProgress(25);
+        
+        try {
+          // Fetch the video blob directly - this should contain the logo already embedded
+          // because it was drawn on the canvas during recording
+          const response = await fetch(videoUrl);
+          if (!response.ok) {
+            throw new Error('Impossible de charger la vidéo locale');
+          }
+          const blob = await response.blob();
+          
+          // Nouveau format de nom de fichier qui inclut l'ID de l'événement
+          const filename = `karaoke-videos/event_${id}/${sessionId}-${Date.now()}.webm`;
 
-      setUploadStep("Sauvegarde de votre performance...");
-      setUploadProgress(50);
-      console.log("Uploading video with embedded logo to S3...");
-      const s3Url = await uploadToS3(blob, filename);
-      
-      if (s3Url) {
-        // Successfully uploaded to S3
-        console.log("Video with logo uploaded successfully to:", s3Url);
-        sessionStorage.setItem('video-s3-url', s3Url);
-        
-        // Préparation de la redirection
-        setUploadStep("Génération du QR code de partage...");
-        setUploadProgress(90);
-        
-        // Attendre un peu avant de rediriger pour que l'utilisateur puisse voir la progression
-        setTimeout(() => {
-          // Rediriger vers la page QR avec l'ID de l'événement
-          router.push(`/event/${id}/qr/${sessionId}?pageUrl=${encodeURIComponent(s3Url)}`);
-        }, 800);
+          setUploadStep("Sauvegarde de votre performance...");
+          setUploadProgress(50);
+          console.log("Uploading video with embedded logo to S3...");
+          const s3Url = await uploadToS3(blob, filename);
+          
+          if (s3Url) {
+            // Successfully uploaded to S3
+            console.log("Video with logo uploaded successfully to:", s3Url);
+            sessionStorage.setItem('video-s3-url', s3Url);
+            finalVideoUrl = s3Url;
+          } else {
+            throw new Error('S3 upload returned no URL');
+          }
+        } catch (uploadError) {
+          console.warn('Upload S3 failed, will use local URL:', uploadError);
+          // Continue with local URL if S3 upload fails
+          finalVideoUrl = tempLocalUrl;
+        }
       } else {
-        // Handle upload failure
-        setUploadError("Impossible de sauvegarder la vidéo en ligne - mais vous pouvez continuer avec une version temporaire");
-        setIsUploading(false);
-        setShowUploadLoader(false);
+        console.log('[Review] Offline mode - using local blob URL');
+        setUploadStep("Mode hors-ligne détecté...");
+        setUploadProgress(30);
+        // En offline, on utilise la version locale
+        finalVideoUrl = tempLocalUrl;
       }
+      
+      // Préparation de la redirection
+      setUploadStep("Génération du QR code de partage...");
+      setUploadProgress(90);
+      
+      // Attendre un peu avant de rediriger pour que l'utilisateur puisse voir la progression
+      setTimeout(() => {
+        // Rediriger vers la page QR avec l'ID de l'événement et l'URL finale (qui peut être blob ou S3)
+        router.push(`/event/${id}/qr/${sessionId}?pageUrl=${encodeURIComponent(finalVideoUrl)}`);
+      }, 800);
     } catch (error) {
-      console.error('Erreur lors de l\'envoi de la vidéo :', error);
-      setUploadError(error instanceof Error ? error.message : "Erreur inconnue pendant l'upload");
+      console.error('Erreur lors du traitement de la vidéo :', error);
+      setUploadError(error instanceof Error ? error.message : "Erreur inconnue pendant le traitement");
       setIsUploading(false);
       setShowUploadLoader(false);
     }

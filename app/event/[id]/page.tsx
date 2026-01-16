@@ -11,6 +11,76 @@ import { getOfflineEvent } from '@/lib/offline/db';
 import { OfflineProvider, useOfflineMode } from '@/contexts/OfflineContext';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 
+const FALLBACK_BACKGROUND_GRADIENT = 'linear-gradient(135deg, #080424 0%, #160e40 100%)';
+
+type OfflineManifestAssets = {
+  logoPath?: string | null;
+  backgroundPath?: string | null;
+};
+
+type OfflineManifestCustomization = {
+  primary_color?: string;
+  secondary_color?: string;
+};
+
+type OfflineManifestEvent = {
+  id?: string;
+  name?: string;
+  description?: string;
+  date?: string;
+  customization?: OfflineManifestCustomization;
+  assets?: OfflineManifestAssets;
+};
+
+type OfflineManifestResponse = {
+  event?: OfflineManifestEvent;
+};
+
+function normalizeOfflineAssetPath(rawPath?: string | null) {
+  if (!rawPath) {
+    return null;
+  }
+
+  return rawPath
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/^\/+/, '')
+    .replace(/^assets\//, '');
+}
+
+function toOfflineAssetUrl(rawPath?: string | null) {
+  const normalized = normalizeOfflineAssetPath(rawPath);
+  if (!normalized) {
+    return undefined;
+  }
+  return `/_offline/assets/${normalized}`;
+}
+
+function buildEventFromManifest(manifestEvent: OfflineManifestEvent, fallbackId: string): Event {
+  const nowIso = new Date().toISOString();
+  const customization = manifestEvent.customization || {};
+  const assets = manifestEvent.assets || {};
+
+  return {
+    id: manifestEvent.id || fallbackId,
+    name: manifestEvent.name || 'Karaoke Offline',
+    description: manifestEvent.description || '',
+    date: manifestEvent.date || nowIso,
+    location: 'Offline',
+    created_at: nowIso,
+    user_id: 'offline',
+    is_active: true,
+    customization: {
+      primary_color: customization.primary_color || '#0334b9',
+      secondary_color: customization.secondary_color || '#2fb9db',
+      background_image: null,
+      backgroundImageUrl: toOfflineAssetUrl(assets.backgroundPath),
+      logo: null,
+      logoUrl: toOfflineAssetUrl(assets.logoPath),
+    },
+  };
+}
+
 function EventPageContent() {
   const params = useParams();
   const id = params.id as string;
@@ -21,6 +91,25 @@ function EventPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bgLoaded, setBgLoaded] = useState(false);
+
+  const setFallbackBackground = () => {
+    document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
+    setBgLoaded(true);
+  };
+
+  const preloadBackgroundImage = (bgUrl: string) => {
+    const img = new window.Image();
+    img.src = bgUrl;
+    img.onload = () => {
+      document.documentElement.style.setProperty('--bg-image', `url('${bgUrl}')`);
+      document.documentElement.classList.add('bg-loaded');
+      setBgLoaded(true);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load background image:', e);
+      setFallbackBackground();
+    };
+  };
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
   function adjustColorLightness(color: string, percent: number): string {
@@ -65,66 +154,66 @@ function EventPageContent() {
       );
 
       // Améliorer la gestion de l'arrière-plan - sans référence à bg.png
+      const existingBackgroundUrl = eventData.customization.backgroundImageUrl;
+
+      if (existingBackgroundUrl) {
+        preloadBackgroundImage(existingBackgroundUrl);
+        return;
+      }
+
       if (eventData.customization.background_image) {
-        console.log("Found background_image:", eventData.customization.background_image);
-        
+        console.log('Found background_image:', eventData.customization.background_image);
+
         try {
           const publicUrlResult = supabase.storage
             .from('karaokestorage')
             .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-        
+
           if (publicUrlResult.data?.publicUrl) {
             const bgUrl = publicUrlResult.data.publicUrl;
-            console.log("Background image URL generated:", bgUrl);
-            
-            // Stocker l'URL dans l'objet événement pour le rendu
+            console.log('Background image URL generated:', bgUrl);
             eventData.customization.backgroundImageUrl = bgUrl;
-            
-            // Pré-charger l'image avant de définir la variable CSS
-            const img = new window.Image();
-            img.src = bgUrl;
-            img.onload = () => {
-              console.log("Background image loaded successfully");
-              document.documentElement.style.setProperty('--bg-image', `url('${bgUrl}')`);
-              document.documentElement.classList.add('bg-loaded');
-              setBgLoaded(true);
-            };
-            img.onerror = (e) => {
-              console.error("Failed to load background image:", e);
-              // Utiliser un dégradé au lieu d'une image par défaut
-              document.documentElement.style.setProperty(
-                '--bg-image', 
-                'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-              );
-              setBgLoaded(true);
-            };
-          } else {
-            console.error("Public URL not available for image:", eventData.customization.background_image);
-            // Utiliser un dégradé au lieu d'une image par défaut
-            document.documentElement.style.setProperty(
-              '--bg-image', 
-              'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-            );
-            setBgLoaded(true);
+            preloadBackgroundImage(bgUrl);
+            return;
           }
+
+          console.error('Public URL not available for image:', eventData.customization.background_image);
+          setFallbackBackground();
         } catch (error) {
-          console.error("Error retrieving image URL:", error);
-          // Utiliser un dégradé au lieu d'une image par défaut
-          document.documentElement.style.setProperty(
-            '--bg-image', 
-            'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-          );
-          setBgLoaded(true);
+          console.error('Error retrieving image URL:', error);
+          setFallbackBackground();
         }
       } else {
-        console.log("No background_image found, using default gradient");
-        // Utiliser un dégradé au lieu d'une image par défaut
-        document.documentElement.style.setProperty(
-          '--bg-image', 
-          'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-        );
-        setBgLoaded(true);
+        console.log('No background_image found, using default gradient');
+        setFallbackBackground();
       }
+    } else {
+      setFallbackBackground();
+    }
+  }
+
+  const displayEvent = async (eventData: Event) => {
+    setEvent(eventData);
+    setLoading(false);
+    await applyCustomization(eventData);
+  };
+
+  async function loadOfflineManifestEvent(): Promise<Event | null> {
+    try {
+      const response = await fetch('/api/offline/manifest', { cache: 'no-store' });
+      if (!response.ok) {
+        return null;
+      }
+
+      const manifest: OfflineManifestResponse = await response.json();
+      if (!manifest?.event) {
+        return null;
+      }
+
+      return buildEventFromManifest(manifest.event, id);
+    } catch (manifestError) {
+      console.warn('[EventPage] Unable to load offline manifest:', manifestError);
+      return null;
     }
   }
 
@@ -132,14 +221,13 @@ function EventPageContent() {
     async function loadEvent() {
       if (id) {
         try {
-          // Try offline first if offline mode enabled
-          if (!navigator.onLine) {
+          // Try offline first if offline mode enabled or no internet
+          if (isOffline || !navigator.onLine) {
             console.log('[EventPage] Offline mode - trying IndexedDB');
             const offlineEvent = await getOfflineEvent(id);
             
             if (offlineEvent) {
               console.log('[EventPage] Found offline event');
-              // Convert offline event to Event type
               const eventData: Event = {
                 id: offlineEvent.id,
                 name: offlineEvent.name,
@@ -149,12 +237,17 @@ function EventPageContent() {
                 created_at: new Date().toISOString(),
                 user_id: '',
                 is_active: true,
-                customization: offlineEvent.customization as typeof eventData.customization,
+                customization: offlineEvent.customization as Event['customization'],
               };
               
-              setEvent(eventData);
-              setLoading(false);
-              await applyCustomization(eventData);
+              await displayEvent(eventData);
+              return;
+            }
+
+            const manifestEvent = await loadOfflineManifestEvent();
+            if (manifestEvent) {
+              console.log('[EventPage] Loaded event from offline manifest');
+              await displayEvent(manifestEvent);
               return;
             }
           }
@@ -174,11 +267,16 @@ function EventPageContent() {
             return;
           }
 
-          setEvent(eventData);
-          setLoading(false);
-          await applyCustomization(eventData);
+          await displayEvent(eventData);
         } catch (err) {
           console.error("Erreur lors du chargement de l'événement:", err);
+          const manifestEvent = await loadOfflineManifestEvent();
+          if (manifestEvent) {
+            console.log('[EventPage] Falling back to offline manifest after error');
+            await displayEvent(manifestEvent);
+            return;
+          }
+
           setError('Cet événement n\'existe pas ou n\'est plus disponible.');
           setLoading(false);
           setBgLoaded(true);
@@ -246,13 +344,22 @@ function EventPageContent() {
         {/* Display the logo if available */}
         {event.customization?.logoUrl && (
           <div className="w-64 h-64 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
-            <Image 
-              src={event.customization.logoUrl} 
-              alt={`${event.name} Logo`} 
-              width={200}
-              height={200}
-              className="max-w-full max-h-full object-contain"
-            />
+            {event.customization.logoUrl.startsWith('/_offline/') ? (
+              <img
+                src={event.customization.logoUrl}
+                alt={`${event.name} Logo`}
+                className="max-w-full max-h-full object-contain"
+                loading="lazy"
+              />
+            ) : (
+              <Image 
+                src={event.customization.logoUrl} 
+                alt={`${event.name} Logo`} 
+                width={200}
+                height={200}
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
           </div>
         )}
       </div>

@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import MusicTransitionLoader from './MusicTransitionLoader';
 import { CameraKitProvider } from '../contexts/CameraKitContext';
 import { useCameraKit } from '../hooks/useCameraKit';
-import { fetchEventById } from '@/lib/supabase/events';
-import { supabase } from '@/lib/supabase/client';
+import { loadLogoImage, createFallbackLogo } from '@/lib/offline/logoHelper';
 
 interface ButtonStyles {
   className?: string;
@@ -67,106 +66,40 @@ function LiveKaraokeRecorderInner({
     session
   } = useCameraKit();
 
-  // Charger l'événement et son logo
+  // Charger le logo depuis offline ou par défaut
   useEffect(() => {
-    if (!eventId) return;
-    
-    async function loadEventAndLogo() {
+    async function loadLogo() {
       try {
-        console.log("Loading event data for logo:", eventId);
-        const eventData = await fetchEventById(eventId);
-        
-        // Vérifier si un logo existe
-        if (eventData?.customization?.logo) {
-          console.log("Found logo:", eventData.customization.logo);
-          
-          try {
-            // Obtenir l'URL publique du logo
-            const publicUrlResult = supabase.storage
-              .from('karaokestorage')
-              .getPublicUrl(`logos/${eventData.customization.logo}`);
-          
-            if (publicUrlResult.data?.publicUrl) {
-              const logoUrl = publicUrlResult.data.publicUrl;
-              console.log("Logo URL generated:", logoUrl);
-              
-              // Pré-charger le logo
-              const img = new Image();
-              img.crossOrigin = "anonymous";
-              img.src = logoUrl;
-              img.onload = () => {
-                console.log("Logo loaded successfully from Supabase");
-                logoRef.current = img;
-                setLogoLoaded(true);
-              };
-              img.onerror = () => {
-                console.error("Failed to load logo from Supabase");
-                // Essayer de charger le logo par défaut
-                loadDefaultLogo();
-              };
-            } else {
-              console.error("Public URL not available for logo:", eventData.customization.logo);
-              loadDefaultLogo();
-            }
-          } catch (error) {
-            console.error("Error retrieving logo URL:", error);
-            loadDefaultLogo();
-          }
+        console.log('Loading logo for event:', eventId);
+        const logo = await loadLogoImage(eventId || '');
+        if (logo) {
+          logoRef.current = logo;
+          setLogoLoaded(true);
         } else {
-          console.log("No custom logo found, using default logo");
-          loadDefaultLogo();
+          // Fallback: créer un logo simple
+          console.log('Creating fallback logo');
+          const fallbackCanvas = createFallbackLogo();
+          const fallbackImg = new Image();
+          fallbackImg.src = fallbackCanvas.toDataURL('image/png');
+          fallbackImg.onload = () => {
+            logoRef.current = fallbackImg;
+            setLogoLoaded(true);
+          };
         }
       } catch (err) {
-        console.error("Error loading event data for logo:", err);
-        loadDefaultLogo();
+        console.error('Error loading logo:', err);
+        // Créer un logo de secours
+        const fallbackCanvas = createFallbackLogo();
+        const fallbackImg = new Image();
+        fallbackImg.src = fallbackCanvas.toDataURL('image/png');
+        fallbackImg.onload = () => {
+          logoRef.current = fallbackImg;
+          setLogoLoaded(true);
+        };
       }
     }
     
-    // Fonction pour charger le logo par défaut en cas d'erreur
-    const loadDefaultLogo = () => {
-      const logo = new Image();
-      logo.crossOrigin = "anonymous";
-      logo.src = '/logo/logo.png';
-      
-      logo.onload = () => {
-        console.log('Default logo loaded successfully');
-        logoRef.current = logo;
-        setLogoLoaded(true);
-      };
-      
-      logo.onerror = () => {
-        console.error('Error loading default logo');
-        
-        // Essayer des chemins alternatifs
-        const paths = ['/logo.png', '/images/logo.png', '/assets/logo.png'];
-        
-        const tryNextPath = (index: number) => {
-          if (index >= paths.length) {
-            console.error('All logo loading attempts failed');
-            return;
-          }
-          
-          const altLogo = new Image();
-          altLogo.crossOrigin = "anonymous";
-          altLogo.src = paths[index];
-          
-          altLogo.onload = () => {
-            console.log(`Alternate logo path loaded successfully: ${paths[index]}`);
-            logoRef.current = altLogo;
-            setLogoLoaded(true);
-          };
-          
-          altLogo.onerror = () => {
-            console.error(`Error loading alternate logo path: ${paths[index]}`);
-            tryNextPath(index + 1);
-          };
-        };
-        
-        tryNextPath(0);
-      };
-    };
-    
-    loadEventAndLogo();
+    loadLogo();
   }, [eventId]);
 
   // Intercepteur d'erreurs amélioré pour éviter les erreurs liées à play()

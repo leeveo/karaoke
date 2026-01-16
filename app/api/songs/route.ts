@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Configuration du client S3 côté serveur (sécurisé)
 const s3Client = new S3Client({
@@ -17,6 +19,9 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = process.env.NEXT_PUBLIC_AWS_S3_BUCKET || 'leeveostockage';
 const BASE_PATH = 'karaokesaas';
+let offlineManifestCache: OfflineManifest | null = null;
+let offlineManifestMtime = 0;
+let offlineManifestPath: string | null = null;
 
 // Configuration pour Next.js
 export const maxDuration = 30; // 30 secondes max
@@ -58,10 +63,40 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
     const category = searchParams.get('category');
     const songKey = searchParams.get('key');
+    const offlineManifest = getOfflineManifest();
 
     console.log(`[API Songs] Action: ${action}, Category: ${category}, Key: ${songKey}`);
     console.log(`[API Songs] AWS Config - Region: ${process.env.AWS_REGION}, Bucket: ${BUCKET_NAME}`);
     console.log(`[API Songs] AWS Credentials - AccessKeyId présent: ${!!process.env.AWS_ACCESS_KEY_ID}`);
+
+    if (offlineManifest) {
+      if (action === 'categories') {
+        const categories = getOfflineCategories(offlineManifest);
+        return NextResponse.json(categories.length ? categories : ['pop', 'rock', 'rap', 'français', 'anglais', 'latino']);
+      }
+
+      if (action === 'songs' && category) {
+        const songs = getOfflineSongsForCategory(offlineManifest, category);
+        if (!songs) {
+          return NextResponse.json(
+            { error: `Catégorie ${category} introuvable dans le manifest offline` },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json(songs);
+      }
+
+      if (action === 'url' && songKey) {
+        const offlineUrl = getOfflineSongUrl(offlineManifest, songKey);
+        if (!offlineUrl) {
+          return NextResponse.json(
+            { error: 'Chanson introuvable dans le manifest offline' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ url: offlineUrl });
+      }
+    }
 
     // Action: Récupérer les catégories
     if (action === 'categories') {
@@ -202,3 +237,159 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+function resolveOfflineManifestPath() {
+  const explicit = process.env.OFFLINE_MANIFEST_PATH;
+  if (explicit && fs.existsSync(explicit)) {
+    return explicit;
+  }
+
+  const packageRoot = process.env.OFFLINE_PACKAGE_ROOT
+    ? path.resolve(process.env.OFFLINE_PACKAGE_ROOT)
+    : null;
+
+  const candidates: string[] = [];
+
+  if (packageRoot && fs.existsSync(packageRoot)) {
+    candidates.push(path.join(packageRoot, 'manifest.json'));
+  }
+
+  const offlineDataDir = path.join(process.cwd(), 'offline-data');
+  if (fs.existsSync(offlineDataDir) && fs.statSync(offlineDataDir).isDirectory()) {
+    const nested = fs
+      .readdirSync(offlineDataDir)
+      .map((entry) => path.join(offlineDataDir, entry, 'manifest.json'));
+    candidates.push(...nested);
+  }
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getOfflineManifest(): OfflineManifest | null {
+  const manifestPath = resolveOfflineManifestPath();
+  if (!manifestPath) {
+    return null;
+  }
+
+  try {
+    const stats = fs.statSync(manifestPath);
+    const hasChanged =
+      manifestPath !== offlineManifestPath ||
+      !offlineManifestCache ||
+      stats.mtimeMs !== offlineManifestMtime;
+
+    if (hasChanged) {
+      const raw = fs.readFileSync(manifestPath, 'utf-8');
+      offlineManifestCache = JSON.parse(raw) as OfflineManifest;
+      offlineManifestMtime = stats.mtimeMs;
+      offlineManifestPath = manifestPath;
+    }
+    return offlineManifestCache;
+  } catch (error) {
+    console.warn('[API Songs] Impossible de charger le manifest offline:', (error as Error).message);
+    return null;
+  }
+}
+
+function getOfflineCategories(manifest: OfflineManifest) {
+  const categories = manifest.categories?.map((cat) => cat.label || cat.id).filter(Boolean) as string[] | undefined;
+  if (!categories || !categories.length) {
+    return [] as string[];
+  }
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const category of categories) {
+    const normalized = normalizeCategory(category);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      deduped.push(category);
+    }
+  }
+  return deduped;
+}
+
+function getOfflineSongsForCategory(manifest: OfflineManifest, category: string) {
+  const target = findOfflineCategory(manifest, category);
+  if (!target) {
+    return null;
+  }
+
+  return (target.songs || []).map((song, index) => {
+    const key = song.key || song.videoPath || `${target.id || target.label || 'category'}-${index}`;
+    return {
+      key,
+      title: song.title || 'Titre inconnu',
+      artist: song.artist || 'Artiste inconnu',
+      size: song.size || undefined,
+      lastModified: song.lastModified ? new Date(song.lastModified) : undefined,
+      imageUrl: toOfflineUrl(song.imagePath),
+      categoryId: target.id || target.label || category,
+    };
+  });
+}
+
+function getOfflineSongUrl(manifest: OfflineManifest, key: string) {
+  for (const category of manifest.categories || []) {
+    for (const song of category.songs || []) {
+      if (song.key === key || song.videoPath === key) {
+        const url = toOfflineUrl(song.videoPath);
+        if (url) {
+          return url;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function findOfflineCategory(manifest: OfflineManifest, category: string) {
+  const normalized = normalizeCategory(category);
+  return (manifest.categories || []).find((cat) => {
+    const matchesId = cat.id && normalizeCategory(cat.id) === normalized;
+    const matchesLabel = cat.label && normalizeCategory(cat.label) === normalized;
+    return matchesId || matchesLabel;
+  });
+}
+
+function normalizeCategory(input?: string | null) {
+  return (input || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+}
+
+function toOfflineUrl(assetPath?: string | null) {
+  if (!assetPath) {
+    return undefined;
+  }
+
+  const sanitized = assetPath
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/^\/+/, '')
+    .replace(/^assets\//, '');
+
+  return `/_offline/assets/${sanitized}`;
+}
+
+type OfflineManifest = {
+  categories?: Array<{ id?: string; label?: string; songs?: Array<OfflineManifestSong> }>;
+};
+
+type OfflineManifestSong = {
+  key?: string;
+  title?: string;
+  artist?: string;
+  size?: number;
+  lastModified?: string;
+  videoPath?: string | null;
+  imagePath?: string | null;
+};

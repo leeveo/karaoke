@@ -4,10 +4,9 @@ import { useParams, useRouter } from 'next/navigation';
 import LiveKaraokeRecorder from '@/components/LiveKaraokeRecorder';
 import { useEffect, useState, useRef } from 'react';
 import { getSongUrl } from '@/services/s3Service';
-import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
-import { supabase } from '@/lib/supabase/client';
 import { useOnlineStatus, useIndexedDB } from '@/hooks/useOfflineMode';
+import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
 
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
@@ -173,78 +172,63 @@ export default function EventKaraokePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decodedSongId, isOnline]);
 
-  // Charger l'événement et ses personnalisations
+  // Charger l'événement et appliquer le thème, même hors ligne
   useEffect(() => {
     async function loadEvent() {
+      if (typeof id !== 'string') {
+        setBgLoaded(true);
+        return;
+      }
+
       try {
-        if (typeof id === 'string') {
-          const eventData = await fetchEventById(id);
-          setEvent(eventData);
-          
-          // Appliquer les couleurs personnalisées
-          if (eventData.customization) {
-            // Couleurs primaires et secondaires
-            const primaryColor = eventData.customization.primary_color || '#0334b9';
-            const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
-            
-            document.documentElement.style.setProperty('--primary-color', primaryColor);
-            document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
-            document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
-            document.documentElement.style.setProperty('--secondary-color', secondaryColor);
-            document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
-            document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
-            
-            // Ajouter la variable avec opacité pour le fond des boutons
-            document.documentElement.style.setProperty('--primary-color-75', hexToRgba(primaryColor, 0.75));
-            
-            // Gradients
-            document.documentElement.style.setProperty(
-              '--primary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.primary_color} 0%, ${adjustColorLightness(eventData.customization.primary_color, 20)} 100%)`
-            );
-            document.documentElement.style.setProperty(
-              '--secondary-gradient', 
-              `linear-gradient(135deg, ${eventData.customization.secondary_color} 0%, ${adjustColorLightness(eventData.customization.secondary_color, 20)} 100%)`
-            );
-            
-            // Background image handling
-            if (eventData.customization.background_image) {
-              try {
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  
-                  // Preload the image
-                  const img = new Image();
-                  img.src = bgUrl;
-                  img.onload = () => {
-                    setBgLoaded(true);
-                  };
-                  img.onerror = () => {
-                    setBgLoaded(true);
-                  };
-                } else {
-                  setBgLoaded(true);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-                setBgLoaded(true);
-              }
-            } else {
-              setBgLoaded(true);
-            }
-          }
+        const eventData = await loadEventWithOfflineFallback(id);
+        if (!eventData) {
+          setBgLoaded(true);
+          return;
+        }
+
+        setEvent(eventData);
+
+        if (!eventData.customization) {
+          setBgLoaded(true);
+          return;
+        }
+
+        const primaryColor = eventData.customization.primary_color || '#0334b9';
+        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
+        document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
+        document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+        document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
+        document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
+        document.documentElement.style.setProperty('--primary-color-75', hexToRgba(primaryColor, 0.75));
+
+        document.documentElement.style.setProperty(
+          '--primary-gradient',
+          `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColorLightness(primaryColor, 20)} 100%)`
+        );
+        document.documentElement.style.setProperty(
+          '--secondary-gradient',
+          `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
+        );
+
+        const bgUrl = eventData.customization.backgroundImageUrl;
+        if (bgUrl) {
+          const img = new Image();
+          img.src = bgUrl;
+          img.onload = () => setBgLoaded(true);
+          img.onerror = () => setBgLoaded(true);
+        } else {
+          setBgLoaded(true);
         }
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
         setBgLoaded(true);
       }
     }
-    
+
     loadEvent();
   }, [id]);
 

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { fetchEventById } from '@/lib/supabase/events';
 import { Event } from '@/types/event';
 import { supabase } from '@/lib/supabase/client';
+import { getOfflineEvent } from '@/lib/offline/db';
 import { useIndexedDB } from '@/hooks/useOfflineMode';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -16,6 +17,95 @@ import 'swiper/css/effect-coverflow';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import './swiper-custom.css';
+
+const FALLBACK_BACKGROUND_GRADIENT = 'linear-gradient(135deg, #080424 0%, #160e40 100%)';
+
+type OfflineManifestAssets = {
+  logoPath?: string | null;
+  backgroundPath?: string | null;
+};
+
+type OfflineManifestCustomization = {
+  primary_color?: string;
+  secondary_color?: string;
+};
+
+type OfflineManifestEvent = {
+  id?: string;
+  name?: string;
+  description?: string;
+  date?: string;
+  customization?: OfflineManifestCustomization;
+  assets?: OfflineManifestAssets;
+};
+
+type OfflineManifestResponse = {
+  event?: OfflineManifestEvent;
+};
+
+function normalizeOfflineAssetPath(rawPath?: string | null) {
+  if (!rawPath) {
+    return null;
+  }
+
+  return rawPath
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/^\/+/, '')
+    .replace(/^assets\//, '');
+}
+
+function toOfflineAssetUrl(rawPath?: string | null) {
+  const normalized = normalizeOfflineAssetPath(rawPath);
+  if (!normalized) {
+    return undefined;
+  }
+  return `/_offline/assets/${normalized}`;
+}
+
+function buildEventFromManifest(manifestEvent: OfflineManifestEvent, fallbackId: string): Event {
+  const nowIso = new Date().toISOString();
+  const customization = manifestEvent.customization || {};
+  const assets = manifestEvent.assets || {};
+
+  return {
+    id: manifestEvent.id || fallbackId,
+    name: manifestEvent.name || 'Karaoke Offline',
+    description: manifestEvent.description || '',
+    date: manifestEvent.date || nowIso,
+    location: 'Offline',
+    created_at: nowIso,
+    user_id: 'offline',
+    is_active: true,
+    customization: {
+      primary_color: customization.primary_color || '#0334b9',
+      secondary_color: customization.secondary_color || '#2fb9db',
+      background_image: null,
+      backgroundImageUrl: toOfflineAssetUrl(assets.backgroundPath),
+      logo: null,
+      logoUrl: toOfflineAssetUrl(assets.logoPath),
+    },
+  };
+}
+
+async function loadOfflineManifestEvent(eventId: string): Promise<Event | null> {
+  try {
+    const response = await fetch('/api/offline/manifest', { cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+
+    const manifest: OfflineManifestResponse = await response.json();
+    if (!manifest?.event) {
+      return null;
+    }
+
+    return buildEventFromManifest(manifest.event, eventId);
+  } catch (error) {
+    console.warn('[CategoryPage] Unable to load offline manifest:', error);
+    return null;
+  }
+}
 
 // Fonction de mappage entre les catégories de l'URL et les dossiers S3
 const mapCategoryToS3Folder = (category: string): string => {
@@ -51,115 +141,176 @@ export default function EventCategoryPageClient({
     });
   }, [params]);
 
+  const setFallbackBackground = () => {
+    document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
+    setBgLoaded(true);
+  };
+
+  const preloadBackgroundImage = (bgUrl: string) => {
+    const img = new Image();
+    img.src = bgUrl;
+    img.onload = () => {
+      document.documentElement.style.setProperty('--bg-image', `url('${bgUrl}')`);
+      document.documentElement.classList.add('bg-loaded');
+      setBgLoaded(true);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load background image:', e);
+      setFallbackBackground();
+    };
+  };
+
+  async function applyCustomization(eventData: Event) {
+    const customization = eventData.customization;
+    if (!customization) {
+      setFallbackBackground();
+      return;
+    }
+
+    const primaryColor = customization.primary_color || '#0334b9';
+    const secondaryColor = customization.secondary_color || '#2fb9db';
+
+    console.log('Application de la couleur primaire:', primaryColor);
+    document.documentElement.style.setProperty('--primary-color', primaryColor);
+    document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
+    document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
+    document.documentElement.style.setProperty('--primary-color-75', hexToRgba(primaryColor, 0.75));
+
+    console.log('Application de la couleur secondaire:', secondaryColor);
+    document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+    document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
+    document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
+
+    document.documentElement.style.setProperty(
+      '--primary-gradient', 
+      `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColorLightness(primaryColor, 20)} 100%)`
+    );
+    document.documentElement.style.setProperty(
+      '--secondary-gradient', 
+      `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
+    );
+
+    if (customization.backgroundImageUrl) {
+      preloadBackgroundImage(customization.backgroundImageUrl);
+      return;
+    }
+
+    if (customization.background_image) {
+      console.log('Found background_image:', customization.background_image);
+      try {
+        const publicUrlResult = supabase.storage
+          .from('karaokestorage')
+          .getPublicUrl(`backgrounds/${customization.background_image}`);
+
+        if (publicUrlResult.data?.publicUrl) {
+          const bgUrl = publicUrlResult.data.publicUrl;
+          console.log('Background image URL generated:', bgUrl);
+          customization.backgroundImageUrl = bgUrl;
+          preloadBackgroundImage(bgUrl);
+          return;
+        }
+
+        console.error('Public URL not available for image:', customization.background_image);
+        setFallbackBackground();
+      } catch (error) {
+        console.error('Error retrieving image URL:', error);
+        setFallbackBackground();
+      }
+    } else {
+      console.log('No background_image found, using default gradient');
+      setFallbackBackground();
+    }
+  }
+
   // Charger l'événement et ses personnalisations
   useEffect(() => {
-    async function loadEvent() {
-      try {
-        if (id) {
-          const eventData = await fetchEventById(id);
-          setEvent(eventData);
-          
-          // Appliquer les couleurs personnalisées
-          if (eventData.customization) {
-            // S'assurer que les couleurs primaires et secondaires sont bien récupérées
-            const primaryColor = eventData.customization.primary_color || '#0334b9';
-            const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
-            
-            // Appliquer les couleurs avec logging pour débogage
-            console.log("Application de la couleur primaire:", primaryColor);
-            document.documentElement.style.setProperty('--primary-color', primaryColor);
-            document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
-            document.documentElement.style.setProperty('--primary-dark', adjustColorLightness(primaryColor, -20));
-            
-            // Ajouter une version avec opacité pour le fond des éléments
-            document.documentElement.style.setProperty('--primary-color-75', hexToRgba(primaryColor, 0.75));
-            
-            console.log("Application de la couleur secondaire:", secondaryColor);
-            document.documentElement.style.setProperty('--secondary-color', secondaryColor);
-            document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
-            document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
-            
-            // Mise à jour des gradients avec les couleurs personnalisées
-            document.documentElement.style.setProperty(
-              '--primary-gradient', 
-              `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColorLightness(primaryColor, 20)} 100%)`
-            );
-            document.documentElement.style.setProperty(
-              '--secondary-gradient', 
-              `linear-gradient(135deg, ${secondaryColor} 0%, ${adjustColorLightness(secondaryColor, 20)} 100%)`
-            );
+    if (!id) {
+      return;
+    }
 
-            // Fix background image loading - sans bg.png
-            if (eventData.customization.background_image) {
-              console.log("Found background_image:", eventData.customization.background_image);
-              
-              try {
-                const publicUrlResult = supabase.storage
-                  .from('karaokestorage')
-                  .getPublicUrl(`backgrounds/${eventData.customization.background_image}`);
-            
-                if (publicUrlResult.data?.publicUrl) {
-                  const bgUrl = publicUrlResult.data.publicUrl;
-                  console.log("Background image URL generated:", bgUrl);
-                  
-                  // Store the full URL in the event object for rendering
-                  eventData.customization.backgroundImageUrl = bgUrl;
-                  
-                  // Preload the image
-                  const img = new Image();
-                  img.src = bgUrl;
-                  img.onload = () => {
-                    console.log("Background image loaded successfully");
-                    document.documentElement.style.setProperty('--bg-image', `url('${bgUrl}')`);
-                    document.documentElement.classList.add('bg-loaded');
-                    setBgLoaded(true);
-                  };
-                  img.onerror = (e) => {
-                    console.error("Failed to load background image:", e);
-                    // Utiliser un dégradé au lieu d'une image par défaut
-                    document.documentElement.style.setProperty(
-                      '--bg-image', 
-                      'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                    );
-                    setBgLoaded(true);
-                  };
-                } else {
-                  console.error("Public URL not available for image:", eventData.customization.background_image);
-                  // Utiliser un dégradé au lieu d'une image par défaut
-                  document.documentElement.style.setProperty(
-                    '--bg-image', 
-                    'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                  );
-                  setBgLoaded(true);
-                }
-              } catch (error) {
-                console.error("Error retrieving image URL:", error);
-                // Utiliser un dégradé au lieu d'une image par défaut
-                document.documentElement.style.setProperty(
-                  '--bg-image', 
-                  'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-                );
-                setBgLoaded(true);
-              }
-            } else {
-              console.log("No background_image found, using default gradient");
-              // Utiliser un dégradé au lieu d'une image par défaut
-              document.documentElement.style.setProperty(
-                '--bg-image', 
-                'linear-gradient(135deg, #080424 0%, #160e40 100%)'
-              );
-              setBgLoaded(true);
-            }
-          }
+    let cancelled = false;
+
+    const handleEventLoaded = async (eventData: Event, source: string) => {
+      if (cancelled) {
+        return;
+      }
+      console.log(source);
+      setEvent(eventData);
+      setError(null);
+      await applyCustomization(eventData);
+    };
+
+    const loadFromIndexedDb = async () => {
+      try {
+        const offlineEvent = await getOfflineEvent(id);
+        if (offlineEvent) {
+          const eventData: Event = {
+            id: offlineEvent.id,
+            name: offlineEvent.name,
+            description: offlineEvent.description,
+            date: new Date().toISOString(),
+            location: 'Offline',
+            created_at: new Date().toISOString(),
+            user_id: '',
+            is_active: true,
+            customization: offlineEvent.customization as Event['customization'],
+          };
+          await handleEventLoaded(eventData, '[CategoryPage] Événement chargé depuis IndexedDB');
+          return true;
         }
+      } catch (indexedError) {
+        console.warn('[CategoryPage] Impossible de charger l\'événement IndexedDB:', indexedError);
+      }
+      return false;
+    };
+
+    const loadFromManifest = async () => {
+      const manifestEvent = await loadOfflineManifestEvent(id);
+      if (manifestEvent) {
+        await handleEventLoaded(manifestEvent, '[CategoryPage] Événement chargé depuis le manifeste offline');
+        return true;
+      }
+      return false;
+    };
+
+    async function loadEvent() {
+      const offlineFirst = typeof navigator !== 'undefined' ? !navigator.onLine : false;
+
+      if (offlineFirst) {
+        if (await loadFromIndexedDb()) {
+          return;
+        }
+        if (await loadFromManifest()) {
+          return;
+        }
+      }
+
+      try {
+        const eventData = await fetchEventById(id);
+        if (!eventData) {
+          throw new Error('Événement introuvable');
+        }
+        await handleEventLoaded(eventData, '[CategoryPage] Événement chargé depuis Supabase');
       } catch (err) {
         console.error('Erreur lors du chargement de l\'événement:', err);
-        setError('Événement introuvable');
-        setBgLoaded(true);
+        if (await loadFromIndexedDb()) {
+          return;
+        }
+        if (await loadFromManifest()) {
+          return;
+        }
+        if (!cancelled) {
+          setError('Événement introuvable');
+          setBgLoaded(true);
+        }
       }
     }
-    
+
     loadEvent();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Charger les chansons de la catégorie
@@ -173,30 +324,31 @@ export default function EventCategoryPageClient({
           const s3FolderCategory = mapCategoryToS3Folder(category);
           console.log(`[CategoryPage] Mapped to S3 folder: ${s3FolderCategory}`);
           
-          // Try online first (with timeout)
-          if (navigator.onLine) {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-              
-              const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(s3FolderCategory)}`, {
-                signal: controller.signal
-              });
-              
-              clearTimeout(timeoutId);
-              
-              if (!response.ok) {
-                throw new Error('Failed to fetch songs');
-              }
-              
-              const songList = await response.json();
+          // Always try local API first (works online & offline kiosk)
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(`/api/songs?action=songs&category=${encodeURIComponent(s3FolderCategory)}`, {
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error('Failed to fetch songs');
+            }
+
+            const songList = await response.json();
+            if (Array.isArray(songList) && songList.length > 0) {
+              console.log(`[CategoryPage] ${songList.length} chansons chargées via /api/songs`);
               setSongs(songList);
               setError(null);
               setIsLoading(false);
               return;
-            } catch (onlineErr) {
-              console.warn('Erreur chargement online, essai offline:', onlineErr);
             }
+          } catch (onlineErr) {
+            console.warn('Erreur chargement via /api/songs, essai offline:', onlineErr);
           }
           
           // Fallback offline - charger depuis IndexedDB
