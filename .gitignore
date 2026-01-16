@@ -42,3 +42,6 @@ next-env.d.ts
 # packages
 .packages/
 *.zip
+
+# documentation - local only
+/documentations/
