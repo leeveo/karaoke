@@ -73,17 +73,17 @@ async function generatePackage() {
       main: 'electron/main.js',
       homepage: './',
       scripts: {
-        start: 'node electron/main.js',
+        start: 'electron electron/main.js',
         server: 'node server.js'
       },
       dependencies: {
+        electron: '^33.0.0',
+        express: '^4.21.1',
         next: '15.5.9',
         react: '^19.0.0',
-        'react-dom': '^19.0.0',
-        express: '^4.21.1'
+        'react-dom': '^19.0.0'
       },
       devDependencies: {
-        electron: '^33.0.0',
         'electron-builder': '^25.1.1'
       }
     };
