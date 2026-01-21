@@ -18,17 +18,51 @@ export default function EventQRPage() {
   const [isOnline, setIsOnline] = useState(true);
   const router = useRouter();
   
-  // Détecter si on est online ou offline
+  // Détecter si on est VRAIMENT online (pas juste navigator.onLine qui peut être faux en Electron)
   useEffect(() => {
-    setIsOnline(navigator.onLine);
+    const checkRealOnlineStatus = async () => {
+      try {
+        // Test avec une requête HEAD légère vers notre propre serveur
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+        
+        await fetch('/api/send-email', {
+          method: 'HEAD',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        // Si on arrive ici sans erreur, on est online
+        setIsOnline(true);
+        console.log('[Online Check] ✓ API accessible, mode ONLINE');
+      } catch {
+        // Si fetch échoue (timeout, network error, etc), on est offline
+        setIsOnline(false);
+        console.log('[Online Check] ✗ API non accessible, mode OFFLINE');
+      }
+    };
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    // Vérifier immédiatement
+    checkRealOnlineStatus();
+
+    // Re-vérifier toutes les 10 secondes
+    const interval = setInterval(checkRealOnlineStatus, 10000);
+
+    // Écouter aussi les événements online/offline du navigateur
+    const handleOnline = () => {
+      console.log('[Online Check] Event online détecté');
+      checkRealOnlineStatus();
+    };
+    const handleOffline = () => {
+      console.log('[Online Check] Event offline détecté');
+      setIsOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

@@ -1,6 +1,6 @@
 # Offline Package for Event KARAOKE SOIREE CACEIS
 
-Generated at 2026-01-21T16:34:44.624Z.
+Generated at 2026-01-21T18:02:41.261Z.
 
 Structure:
 - assets/event → logo/background
