@@ -336,6 +336,34 @@ export default function EventQRPage() {
     try {
       const finalUrl = videoUrl || pageUrl;
 
+      // MODE OFFLINE: Sauvegarder dans IndexedDB pour envoi ultérieur
+      if (!isOnline && finalUrl?.startsWith('blob:')) {
+        console.log('[sendEmail] Mode offline détecté - sauvegarde dans IndexedDB');
+        
+        // Récupérer le blob depuis l'URL blob
+        const response = await fetch(finalUrl);
+        const videoBlob = await response.blob();
+        
+        // Sauvegarder dans IndexedDB
+        await pendingEmailStore.savePendingEmail({
+          id: `${sessionId}-${Date.now()}`,
+          videoBlob: videoBlob,
+          email: formData.email,
+          name: formData.name,
+          subject: formData.subject || 'Votre performance karaoké 🎤',
+          message: formData.message || '',
+          sessionId: sessionId as string,
+          eventId: id as string,
+          createdAt: Date.now(),
+          retries: 0
+        });
+        
+        console.log('[sendEmail] ✓ Email sauvegardé dans IndexedDB pour synchronisation ultérieure');
+        return { success: true, offline: true };
+      }
+
+      // MODE ONLINE: Envoyer directement via API
+      console.log('[sendEmail] Mode online - envoi via API');
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -491,22 +519,28 @@ export default function EventQRPage() {
 
       // Step 2: Envoyer l'email via notre API
       console.log('✓ Sending email with videoUrlForEmail:', videoUrlForEmail);
-      await sendEmail(videoUrlForEmail);
+      const emailResult = await sendEmail(videoUrlForEmail);
       
       // Marquer comme envoyé
       setEmailSent(true);
       
-      // Copier le lien dans le presse-papiers
-      await navigator.clipboard.writeText(videoUrlForEmail as string);
+      // Copier le lien dans le presse-papiers (seulement si pas blob)
+      if (videoUrlForEmail && !videoUrlForEmail.startsWith('blob:')) {
+        await navigator.clipboard.writeText(videoUrlForEmail as string);
+      }
       
-      // Afficher le pop-up de succès
-      setSuccessMessage('Email envoyé avec succès et lien copié!');
+      // Afficher le pop-up de succès avec message adapté
+      if (emailResult?.offline) {
+        setSuccessMessage('📧 Email sauvegardé! Il sera envoyé automatiquement lors de la prochaine connexion internet.');
+      } else {
+        setSuccessMessage('Email envoyé avec succès et lien copié!');
+      }
       setShowSuccessPopup(true);
       
-      // Fermer automatiquement le pop-up après 3 secondes
+      // Fermer automatiquement le pop-up après 5 secondes (plus long pour lire le message offline)
       setTimeout(() => {
         setShowSuccessPopup(false);
-      }, 3000);
+      }, emailResult?.offline ? 5000 : 3000);
       
       // Fermer le formulaire
       setShowForm(false);
