@@ -1,0 +1,107 @@
+/* Styles personnalisés pour le clavier virtuel */
+
+/* Container du modal adapté pour le clavier */
+.modal-with-keyboard .max-h-[90vh] {
+  max-height: 85vh !important;
+}
+
+/* Améliorer la lisibilité du clavier sur mobile */
+@media (max-width: 768px) {
+  .virtual-keyboard-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: white;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.15);
+    padding: 15px;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+  
+  /* Ajuster la taille du modal quand le clavier est ouvert */
+  .modal-with-keyboard {
+    padding-bottom: 42vh !important;
+  }
+  
+  .email-keyboard {
+    margin-top: 5px !important;
+  }
+  
+  .email-keyboard .hg-button {
+    height: 35px !important;
+    font-size: 13px !important;
+    margin: 1px !important;
+  }
+  
+  .email-keyboard .hg-green,
+  .email-keyboard .hg-red {
+    font-size: 11px !important;
+  }
+}
+
+/* Améliorer l'animation d'ouverture/fermeture */
+.virtual-keyboard-wrapper {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.virtual-keyboard-wrapper.entering {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
+.virtual-keyboard-wrapper.entered {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Style des boutons de déclenchement */
+.keyboard-trigger-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.keyboard-trigger-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.keyboard-trigger-btn:active {
+  transform: translateY(0);
+}
+
+.keyboard-trigger-btn.email {
+  background: linear-gradient(135deg, #2fb9db 0%, #0334b9 100%);
+}
+
+/* Animation du header du clavier virtuel */
+.keyboard-header {
+  animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Indicateur visuel du champ actif */
+.input-focused {
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.3) !important;
+  border-color: #ec4899 !important;
+}

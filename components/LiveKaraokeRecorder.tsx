@@ -16,6 +16,7 @@ interface ButtonStyles {
 interface LiveKaraokeRecorderProps {
   karaokeSrc: string;
   eventId?: string;
+  logoUrl?: string; // URL du logo de l'événement
   buttonStyles?: ButtonStyles;
 }
 
@@ -32,6 +33,7 @@ function LiveKaraokeRecorderWithCameraKit(props: LiveKaraokeRecorderProps) {
 function LiveKaraokeRecorderInner({ 
   karaokeSrc, 
   eventId,
+  logoUrl,
   buttonStyles = {} 
 }: LiveKaraokeRecorderProps) {
   // Références
@@ -70,37 +72,60 @@ function LiveKaraokeRecorderInner({
   useEffect(() => {
     async function loadLogo() {
       try {
-        console.log('Loading logo for event:', eventId);
-        const logo = await loadLogoImage(eventId || '');
-        if (logo) {
-          logoRef.current = logo;
-          setLogoLoaded(true);
-        } else {
-          // Fallback: créer un logo simple
-          console.log('Creating fallback logo');
-          const fallbackCanvas = createFallbackLogo();
-          const fallbackImg = new Image();
-          fallbackImg.src = fallbackCanvas.toDataURL('image/png');
-          fallbackImg.onload = () => {
-            logoRef.current = fallbackImg;
+        // Si un logoUrl est fourni (mode online), l'utiliser en priorité
+        if (logoUrl) {
+          console.log('Loading logo from provided URL:', logoUrl);
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = logoUrl;
+          
+          img.onload = () => {
+            console.log('Logo loaded successfully from provided URL');
+            logoRef.current = img;
             setLogoLoaded(true);
           };
+          
+          img.onerror = () => {
+            console.warn('Failed to load logo from provided URL, trying fallback');
+            // Essayer avec le helper en cas d'échec
+            loadFromHelper();
+          };
+          return;
         }
+        
+        // Sinon, utiliser le helper (mode offline ou pas de logo fourni)
+        loadFromHelper();
+        
       } catch (err) {
         console.error('Error loading logo:', err);
-        // Créer un logo de secours
-        const fallbackCanvas = createFallbackLogo();
-        const fallbackImg = new Image();
-        fallbackImg.src = fallbackCanvas.toDataURL('image/png');
-        fallbackImg.onload = () => {
-          logoRef.current = fallbackImg;
-          setLogoLoaded(true);
-        };
+        createFallback();
       }
     }
     
+    async function loadFromHelper() {
+      console.log('Loading logo for event:', eventId);
+      const logo = await loadLogoImage(eventId || '');
+      if (logo) {
+        logoRef.current = logo;
+        setLogoLoaded(true);
+      } else {
+        createFallback();
+      }
+    }
+    
+    function createFallback() {
+      console.log('Creating fallback logo');
+      const fallbackCanvas = createFallbackLogo();
+      const fallbackImg = new Image();
+      fallbackImg.src = fallbackCanvas.toDataURL('image/png');
+      fallbackImg.onload = () => {
+        logoRef.current = fallbackImg;
+        setLogoLoaded(true);
+      };
+    }
+    
     loadLogo();
-  }, [eventId]);
+  }, [eventId, logoUrl]);
 
   // Intercepteur d'erreurs amélioré pour éviter les erreurs liées à play()
   useEffect(() => {
@@ -119,7 +144,7 @@ function LiveKaraokeRecorderInner({
       ) {
         return; // Supprimer ces erreurs spécifiques
       }
-      return originalConsoleError.apply(console, args);
+      originalConsoleError(...args);
     };
     
     return () => {
@@ -793,10 +818,10 @@ function LiveKaraokeRecorderInner({
         <div className="mt-6 flex justify-center w-full">
           <button
             onClick={stopRecording}
-            className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl hover:scale-105 hover:-translate-y-1"
+            className="btn-primary flex items-center gap-3 px-12 py-6 rounded-xl hover:scale-105 hover:-translate-y-1 text-2xl font-bold"
             style={{ background: 'var(--primary-gradient)' }}
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
               <rect x="6" y="6" width="8" height="8" />
             </svg>
             <span>Arrêter l&apos;enregistrement</span>

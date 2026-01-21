@@ -175,14 +175,33 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
     setLogoPreview(previewUrl);
     
     try {
+      // Si on édite un événement et qu'il y a déjà un logo, le supprimer d'abord
+      if (initialData && formValues.customization.logo) {
+        console.log("Deleting old logo:", formValues.customization.logo);
+        const { error: deleteError } = await supabase.storage
+          .from('karaokestorage')
+          .remove([`logos/${formValues.customization.logo}`]);
+        
+        if (deleteError) {
+          console.warn("Failed to delete old logo:", deleteError);
+        } else {
+          console.log("Old logo deleted successfully");
+        }
+      }
+      
       // Generate a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `logo_${Date.now()}.${fileExt}`;
       
+      console.log("Uploading new logo:", fileName);
+      
       // Upload to Supabase Storage
       const { error } = await supabase.storage
         .from('karaokestorage')
-        .upload(`logos/${fileName}`, file);
+        .upload(`logos/${fileName}`, file, {
+          cacheControl: '0', // Désactiver le cache
+          upsert: false // Ne pas écraser si le fichier existe déjà
+        });
       
       if (error) {
         throw error;

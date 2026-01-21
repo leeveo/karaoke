@@ -50,12 +50,16 @@ async function copyDir(src, dest) {
 
 async function generatePackage() {
   try {
-    // 1. Copier l'app compilée + Electron
+    // 1. Copier l'app compilée + Electron + node_modules
     console.log('[Package] 📦 Copying app files...');
     await copyDir(path.join(__dirname, '../.next'), path.join(TEMP_DIR, '.next'));
     await copyDir(path.join(__dirname, '../public'), path.join(TEMP_DIR, 'public'));
     await copyDir(path.join(__dirname, '../electron'), path.join(TEMP_DIR, 'electron'));
     await copyDir(OFFLINE_EVENT_DIR, path.join(TEMP_DIR, 'offline-data', eventId));
+    
+    // CRITICAL: Copier tous les modules Node.js nécessaires
+    console.log('[Package] 📦 Copying node_modules... (This may take a few minutes)');
+    await copyDir(path.join(__dirname, '../node_modules'), path.join(TEMP_DIR, 'node_modules'));
 
     // 2. Copier server.js
     console.log('[Package] 🔧 Copying server.js...');
@@ -63,6 +67,16 @@ async function generatePackage() {
       path.join(__dirname, '../server.js'),
       path.join(TEMP_DIR, 'server.js')
     );
+
+    // 2.5. Copier le fichier .env.local (variables d'environnement)
+    console.log('[Package] 🔐 Copying .env.local...');
+    const envLocalPath = path.join(__dirname, '../.env.local');
+    if (fs.existsSync(envLocalPath)) {
+      fs.copyFileSync(envLocalPath, path.join(TEMP_DIR, '.env.local'));
+      console.log('[Package] ✓ .env.local copied successfully');
+    } else {
+      console.warn('[Package] ⚠️  .env.local not found - email sending may not work');
+    }
 
     // 3. Créer package.json Electron
     console.log('[Package] 📋 Creating package.json...');
@@ -81,7 +95,9 @@ async function generatePackage() {
         express: '^4.21.1',
         next: '15.5.9',
         react: '^19.0.0',
-        'react-dom': '^19.0.0'
+        'react-dom': '^19.0.0',
+        '@aws-sdk/client-s3': '^3.0.0',
+        'aws-sdk': '^2.0.0'
       },
       devDependencies: {
         'electron-builder': '^25.1.1'
@@ -152,15 +168,132 @@ function writeStartScripts(eventLabel) {
   const windowsScript = [
     '@echo off',
     'setlocal',
-    'cd /d %~dp0',
-    'if not exist node_modules (',
-    '  echo [Karaoke Offline] Installing dependencies...',
-    '  npm install --omit=dev',
+    '',
+    ':: DIAGNOSTIC SCRIPT - Tout est loggé dans debug.log',
+    'echo ======================================== > debug.log',
+    'echo [DEBUG] Script start.bat lance a %date% %time% >> debug.log',
+    'echo ======================================== >> debug.log',
+    'echo. >> debug.log',
+    '',
+    ':: Changer vers le dossier du script',
+    'echo [DEBUG] Changement vers dossier script... >> debug.log',
+    'cd /d "%~dp0" 2>> debug.log',
+    'echo [DEBUG] Dossier actuel: %CD% >> debug.log',
+    'echo. >> debug.log',
+    '',
+    ':: Afficher a l\'ecran ET dans le log',
+    'echo ========================================',
+    'echo [Karaoke Offline] Demarrage...',
+    'echo ========================================',
+    'echo [DEBUG] Affichage initial OK >> debug.log',
+    'echo.',
+    '',
+    ':: Test 1: Verifier Node.js',
+    'echo [TEST 1] Verification Node.js... >> debug.log',
+    'echo [TEST 1] Verification Node.js...',
+    'node --version >nul 2>>debug.log',
+    'if %errorlevel% neq 0 (',
+    '  echo [ERREUR] Node.js non installe ou introuvable! >> debug.log',
+    '  echo ❌ ERREUR: Node.js non installe ou introuvable!',
+    '  echo Veuillez installer Node.js depuis https://nodejs.org',
+    '  echo Consultez debug.log pour plus de details.',
+    '  echo.',
+    '  echo Appuyez sur une touche pour fermer...',
+    '  pause >nul',
+    '  exit /b 1',
     ')',
+    '',
+    'echo [DEBUG] Node.js detecte >> debug.log',
+    'node --version >> debug.log 2>&1',
+    'echo ✅ Node.js detecte:',
+    'node --version',
+    'echo.',
+    '',
+    ':: Test 2: Verifier package.json',
+    'echo [TEST 2] Verification package.json... >> debug.log',
+    'echo [TEST 2] Verification package.json...',
+    'if not exist package.json (',
+    '  echo [ERREUR] package.json manquant! >> debug.log',
+    '  echo ❌ ERREUR: package.json manquant!',
+    '  echo Consultez debug.log pour plus de details.',
+    '  pause >nul',
+    '  exit /b 1',
+    ')',
+    'echo [DEBUG] package.json present >> debug.log',
+    'echo ✅ package.json present',
+    'echo.',
+    '',
+    ':: Test 3: Verifier node_modules',
+    'echo [TEST 3] Verification node_modules... >> debug.log',
+    'echo [TEST 3] Verification node_modules...',
+    'if not exist node_modules (',
+    '  echo [ERREUR] Dossier node_modules manquant! >> debug.log',
+    '  echo ❌ ERREUR: Dossier node_modules manquant!',
+    '  echo Ce ZIP ne contient pas les dependances necessaires.',
+    '  echo Consultez debug.log pour plus de details.',
+    '  pause >nul',
+    '  exit /b 1',
+    ')',
+    'echo [DEBUG] node_modules present >> debug.log',
+    'echo ✅ Dependances detectees.',
+    'echo.',
+    '',
+    ':: Test 4: Verifier AWS SDK',
+    'echo [TEST 4] Verification AWS SDK... >> debug.log',
+    'echo [TEST 4] Verification AWS SDK...',
+    'if not exist "node_modules\\@aws-sdk\\client-s3" (',
+    '  echo [ERREUR] AWS SDK manquant! >> debug.log',
+    '  echo ❌ ERREUR: AWS SDK manquant!',
+    '  echo Consultez debug.log pour plus de details.',
+    '  pause >nul',
+    '  exit /b 1',
+    ')',
+    'echo [DEBUG] AWS SDK present >> debug.log',
+    'echo ✅ AWS SDK present.',
+    'echo.',
+    '',
+    ':: Configuration',
+    'echo [DEBUG] Configuration variables... >> debug.log',
     'set KARAOKE_OFFLINE_PORT=3210',
     `set EVENT_ID=${eventLabel}`,
-    'npm run start',
+    'echo Port: %KARAOKE_OFFLINE_PORT%',
+    'echo Event ID: %EVENT_ID%',
+    'echo [DEBUG] Port: %KARAOKE_OFFLINE_PORT% >> debug.log',
+    'echo [DEBUG] Event ID: %EVENT_ID% >> debug.log',
+    'echo.',
+    '',
+    ':: Lancer l\'application',
+    'echo [DEBUG] Tentative lancement npm run start... >> debug.log',
+    'echo [Karaoke Offline] Lancement de l\'application...',
+    'echo Si ca plante, consultez debug.log pour les details.',
+    'echo.',
+    '',
+    'npm run start 2>> debug.log',
+    'set EXIT_CODE=%errorlevel%',
+    'echo [DEBUG] npm run start termine avec code: %EXIT_CODE% >> debug.log',
+    '',
+    'if %EXIT_CODE% neq 0 (',
+    '  echo. >> debug.log',
+    '  echo [ERREUR] Echec lancement application! >> debug.log',
+    '  echo Code erreur: %EXIT_CODE% >> debug.log',
+    '  echo.',
+    '  echo ❌ ERREUR lors du lancement de l\'application!',
+    '  echo Code d\'erreur: %EXIT_CODE%',
+    '  echo.',
+    '  echo !! CONSULTEZ le fichier debug.log pour les details !!',
+    '  echo.',
+    '  echo Appuyez sur une touche pour fermer...',
+    '  pause >nul',
+    '  exit /b %EXIT_CODE%',
+    ')',
+    '',
+    'echo [DEBUG] Application lancee avec succes! >> debug.log',
+    'echo ✅ Application lancee avec succes!',
+    '',
     'endlocal',
+    'echo.',
+    'echo Appuyez sur une touche pour fermer...',
+    'pause >nul',
     '',
   ].join('\r\n');
 
@@ -171,10 +304,7 @@ function writeStartScripts(eventLabel) {
     'set -euo pipefail',
        'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
        'cd "$SCRIPT_DIR"',
-       'if [ ! -d node_modules ]; then',
-       '  echo "[Karaoke Offline] Installing dependencies..."',
-    '  npm install --omit=dev',
-    'fi',
+       'echo "[Karaoke Offline] Starting with pre-installed dependencies..."',
     'export KARAOKE_OFFLINE_PORT=3210',
     `export EVENT_ID=${eventLabel}`,
     'npm run start',

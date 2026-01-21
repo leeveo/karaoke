@@ -86,10 +86,41 @@ Elles se téléchargent au **premier démarrage**.
 
 ## 👤 **Workflow pour l'Utilisateur Final**
 
+### Étape 0: PRÉREQUIS - Installation Node.js ⚠️
+
+**OBLIGATOIRE:** Votre machine DOIT avoir Node.js installé!
+
+#### Windows:
+1. Aller sur https://nodejs.org
+2. Télécharger "LTS" (version recommandée)
+3. Installer avec les options par défaut
+4. Redémarrer l'ordinateur
+5. Vérifier: Ouvrir CMD et taper `node --version`
+
+#### Mac:
+1. Aller sur https://nodejs.org  
+2. Télécharger "LTS" pour macOS
+3. Installer le .pkg
+4. Vérifier: Ouvrir Terminal et taper `node --version`
+
+#### Linux (Ubuntu/Debian):
+```bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version
+```
+
+**✅ Version minimale requise: Node.js 18+**
+
 ### Étape 1: Recevoir le ZIP (email, clé USB, cloud)
 ```
-KaraokeApp-Venue-2025.zip (10-15 MB)
+KaraokeApp-Venue-2025.zip (~2.7 GB - COMPLET)
 ```
+
+**Note importante:** Le ZIP est maintenant beaucoup plus gros mais 100% fonctionnel !
+- ✅ Contient TOUS les modules Node.js nécessaires
+- ✅ Aucune installation supplémentaire requise
+- ✅ Fonctionne immédiatement après extraction
 
 ### Étape 2: Extraire le ZIP
 ```
@@ -109,6 +140,18 @@ Double-clic: start.bat
 Terminal: ./start.sh
 ou double-click start.sh
 ```
+
+**Note:** Le package ZIP contient déjà tout ce qui est nécessaire :
+- ✅ App Next.js compilée (pas besoin d'installer Next.js)
+- ✅ Serveur Node.js intégré (server.js)
+- ✅ Toutes les dépendances incluses
+- ✅ Scripts de lancement automatiques
+
+**Vous n'avez PAS besoin d'installer :**
+- ❌ Next.js
+- ❌ NPM packages
+- ❌ Outils de développement
+- ❌ Base de données locale
 
 ### Étape 4: Premier démarrage (AVEC INTERNET)
 
@@ -250,10 +293,15 @@ Tous les assets (chansons, images) locaux
 |---------|--------|
 | App compilée (.next/) | ~8MB |
 | Public assets (scripts, etc.) | ~2MB |
+| **node_modules/ (COMPLET)** | **~2.7GB** |
 | server.js + launchers | ~50KB |
-| **Total ZIP** | **~10-15 MB** |
+| **Total ZIP** | **~2.7 GB** |
 
-✅ **Très petit et portable!**
+⚠️ **ZIP plus gros mais 100% autonome !**
+- ✅ Fonctionne sur toute machine avec Node.js
+- ✅ Aucun `npm install` requis
+- ✅ Tous les modules AWS SDK inclus
+- ✅ Prêt à l'emploi immédiatement
 
 ### Téléchargement au premier démarrage (ce qui se synchronise)
 
@@ -283,13 +331,103 @@ Chansons + images en cache: ~10MB par chanson
 
 ## 📥 **Détails du téléchargement intelligent**
 
-## 🔒 **Sécurité**
+## � **DÉPANNAGE COMMUN**
 
-✅ **Utilisateur n'a besoin de:**
-- ✓ Pas de Node.js installé
-- ✓ Pas de npm/yarn/pnpm
-- ✓ Pas de IDE ou terminal
-- ✓ Juste Windows/Mac/Linux + navigateur
+### Erreur: `Cannot find module '@aws-sdk/client-s3'`
+
+**CAUSE:** Le ZIP ne contient pas tous les modules Node.js nécessaires
+
+**SYMPTÔMES:**
+```
+Error: Cannot find module '@aws-sdk/client-s3'
+TypeError: dispatcher.getOwner is not a function
+```
+
+**✅ SOLUTION APPLIQUÉE - Le nouveau ZIP inclut TOUT :**
+
+1. ✅ Le dossier `node_modules` COMPLET est maintenant inclus
+2. ✅ Tous les modules AWS SDK sont présents 
+3. ✅ Le ZIP fait ~2.7 GB mais fonctionne 100% partout
+4. ✅ Plus besoin de `npm install` sur la machine cible
+5. ✅ Extraction → Start.bat → Ça marche !
+
+**NOUVEAU contenu du ZIP :**
+```
+📁 karaoke-package/
+├── .next/          (app compilée)
+├── node_modules/   ✅ TOUS les modules (2.7GB)
+├── offline-data/   (données offline)
+├── public/
+├── electron/
+├── server.js
+├── package.json
+├── start.bat
+└── start.sh
+```
+
+**SOLUTION TECHNIQUE DÉTAILLÉE:**
+
+**Étape 1: Préparer le package complet**
+```bash
+# Dans votre projet de dev
+npm install --production --force
+npm run build
+
+# Vérifier que node_modules contient @aws-sdk/client-s3
+dir node_modules | findstr aws-sdk
+```
+
+**Étape 2: Créer le ZIP avec TOUS les modules**
+```
+📁 karaoke-package/
+├── .next/          (app compilée)
+├── node_modules/   ⚠️ OBLIGATOIRE - Tous les modules
+├── offline-data/   (données offline)
+├── public/
+├── electron/
+├── server.js
+├── package.json
+├── next.config.js
+├── start.bat
+└── start.sh
+```
+
+**Étape 3: Tester avant distribution**
+```bash
+# Supprimer node_modules dans le ZIP extrait
+rmdir /s node_modules
+
+# Réinstaller pour tester
+npm install --production
+
+# Si ça marche, le ZIP est bon
+```
+
+### Erreurs de versions Node.js
+
+**Si l'erreur persiste:** Vérifier les versions
+```bash
+node --version
+npm --version
+```
+
+**Versions recommandées:**
+- Node.js: 18.x ou 20.x (LTS)
+- NPM: 9.x ou 10.x
+
+## �🔒 **Sécurité**
+
+✅ **Package autonome - Presque tout inclus:**
+- ✓ App Next.js pré-compilée
+- ✓ Serveur Node.js intégré
+- ✓ Toutes les dépendances NPM
+- ✓ Scripts de lancement automatiques
+
+⚠️ **Seul prérequis: Node.js runtime**
+- ✓ Nécessaire pour exécuter server.js
+- ✓ Pas besoin de npm/yarn/pnpm
+- ✓ Pas besoin de IDE ou outils de dev
+- ✓ Juste l'environnement d'exécution Node.js
 
 ✅ **Data stockage:**
 - Tout en local IndexedDB (navigateur)
@@ -298,6 +436,45 @@ Chansons + images en cache: ~10MB par chanson
 - Chaque instance est isolée
 
 ---
+
+### Script start.bat se ferme immédiatement
+
+**CAUSE:** Le script n'a pas de gestion d'erreur et se ferme avant de montrer les messages
+
+**✅ SOLUTION APPLIQUÉE ET INTÉGRÉE - Le nouveau start.bat est automatique :**
+
+Le script `start.bat` généré inclut maintenant automatiquement :
+```batch
+@echo off
+:: DIAGNOSTIC SCRIPT - Tout est loggé dans debug.log
+echo ======================================== > debug.log
+echo [DEBUG] Script start.bat lance a %date% %time% >> debug.log
+
+:: Tests étape par étape
+echo [TEST 1] Verification Node.js...
+node --version >nul 2>>debug.log
+if %errorlevel% neq 0 (
+  echo ❌ ERREUR: Node.js non installé!
+  echo Consultez debug.log pour plus de details.
+  pause >nul
+  exit /b 1
+)
+
+:: + 3 autres tests (package.json, node_modules, AWS SDK)
+
+:: Lancement avec logging complet
+npm run start 2>> debug.log
+if %errorlevel% neq 0 (
+  echo ❌ ERREUR lors du lancement!
+  echo !! CONSULTEZ le fichier debug.log !!
+  pause >nul
+  exit /b %errorlevel%
+)
+```
+
+**🔄 AUTOMATIQUEMENT APPLIQUÉ À TOUS LES NOUVEAUX BUILDS !**
+
+Plus besoin de modifications manuelles - chaque `npm run kiosk:build` génère maintenant le script amélioré.
 
 ## 🚨 **Troubleshooting**
 

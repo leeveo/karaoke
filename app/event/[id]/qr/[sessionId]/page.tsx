@@ -2,6 +2,8 @@
 
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
+import VirtualKeyboard from '@/components/VirtualKeyboard';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Event as EventType } from '@/types/event';
 import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
@@ -191,6 +193,8 @@ export default function EventQRPage() {
   const [countdown, setCountdown] = useState(45);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false);
+  const [currentInputField, setCurrentInputField] = useState<'name' | 'email'>('email');
 
   // Forcer l'affichage du clavier virtuel quand le formulaire s'ouvre
   useEffect(() => {
@@ -297,6 +301,25 @@ export default function EventQRPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // Gérer le focus sur les champs d'input pour afficher le clavier virtuel
+  const handleInputFocus = (fieldName: 'name' | 'email') => {
+    setCurrentInputField(fieldName);
+    setShowVirtualKeyboard(true);
+  };
+
+  // Gérer le changement via le clavier virtuel
+  const handleVirtualKeyboardChange = (input: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [currentInputField]: input
+    }));
+  };
+
+  // Fermer le clavier virtuel
+  const closeVirtualKeyboard = () => {
+    setShowVirtualKeyboard(false);
   };
 
   // Extract old S3 key from video URL for renaming
@@ -537,7 +560,7 @@ export default function EventQRPage() {
         <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         
         {/* Contenu principal - Formulaire offline */}
-        <div className="z-10 w-full max-w-2xl flex flex-col items-center">
+        <div className="z-10 w-full max-w-7xl flex flex-col items-center">
           <div className="bg-white rounded-lg shadow-2xl w-full"
             style={{
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
@@ -612,6 +635,35 @@ export default function EventQRPage() {
                     }}
                     placeholder="votre@email.com"
                   />
+                  
+                  {/* Boutons de raccourci email */}
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 mb-2">Raccourcis email :</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com', '@wanadoo.com', '@orange.fr', '@caceis.com'].map((domain) => (
+                        <button
+                          key={domain}
+                          type="button"
+                          onClick={() => {
+                            const currentEmail = formData.email || '';
+                            const atIndex = currentEmail.indexOf('@');
+                            const newEmail = atIndex >= 0 
+                              ? currentEmail.substring(0, atIndex) + domain
+                              : currentEmail + domain;
+                            setFormData(prev => ({ ...prev, email: newEmail }));
+                          }}
+                          className="px-3 py-1 text-sm rounded-full border transition-all duration-200 hover:shadow-md"
+                          style={{
+                            borderColor: 'var(--primary-color)',
+                            color: 'var(--primary-color)',
+                            background: 'rgba(139, 92, 246, 0.05)'
+                          }}
+                        >
+                          {domain}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-start">
@@ -717,6 +769,28 @@ export default function EventQRPage() {
               >
                 {event.name}
               </h2>
+              
+              {/* Afficher le logo de l'événement si disponible */}
+              {event.customization?.logoUrl && (
+                <div className="mt-4 mx-auto w-32 h-32 bg-white/10 backdrop-blur-md rounded-lg p-2 flex items-center justify-center">
+                  {event.customization.logoUrl.startsWith('/_offline/') ? (
+                    <img
+                      src={event.customization.logoUrl}
+                      alt={`${event.name} Logo`}
+                      className="max-w-full max-h-full object-contain"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Image 
+                      src={event.customization.logoUrl} 
+                      alt={`${event.name} Logo`} 
+                      width={120}
+                      height={120}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           )}
           
@@ -808,7 +882,7 @@ export default function EventQRPage() {
       {/* Popup de formulaire */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl animate-fade-in overflow-y-auto max-h-[90vh]">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl animate-fade-in overflow-y-auto max-h-[90vh]">
             <div className="p-8">
               <h2 
                 className="text-3xl font-bold mb-6 text-center"
@@ -840,6 +914,7 @@ export default function EventQRPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    onFocus={() => handleInputFocus('name')}
                     autoFocus
                     inputMode="text"
                     className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
@@ -860,6 +935,7 @@ export default function EventQRPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    onFocus={() => handleInputFocus('email')}
                     inputMode="email"
                     className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
                     style={{ 
@@ -867,6 +943,35 @@ export default function EventQRPage() {
                     }}
                     placeholder="votre@email.com"
                   />
+                  
+                  {/* Boutons de raccourci email */}
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 mb-2">Raccourcis email :</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com', '@wanadoo.com', '@orange.fr', '@caceis.com'].map((domain) => (
+                        <button
+                          key={domain}
+                          type="button"
+                          onClick={() => {
+                            const currentEmail = formData.email || '';
+                            const atIndex = currentEmail.indexOf('@');
+                            const newEmail = atIndex >= 0 
+                              ? currentEmail.substring(0, atIndex) + domain
+                              : currentEmail + domain;
+                            setFormData(prev => ({ ...prev, email: newEmail }));
+                          }}
+                          className="px-3 py-1 text-sm rounded-full border transition-all duration-200 hover:shadow-md"
+                          style={{
+                            borderColor: 'var(--primary-color)',
+                            color: 'var(--primary-color)',
+                            background: 'rgba(139, 92, 246, 0.05)'
+                          }}
+                        >
+                          {domain}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-start">
@@ -885,22 +990,10 @@ export default function EventQRPage() {
                     <label htmlFor="rgpdConsent" className="font-medium text-gray-700 text-base">
                      Accepter les conditions RGPD
                     </label>
-                    <p className="text-gray-500 text-sm mt-1">
-                      En cochant cette case, vous acceptez que nous utilisions vos données personnelles pour vous contacter à propos de votre performance karaoké. Vos données ne seront pas partagées avec des tiers.
-                    </p>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-md text-base"
-                  style={{ 
-                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                    color: 'var(--primary-dark)'
-                  }}
-                >
-                  <p>Un email contenant votre vidéo karaoké {event ? `de l&apos;événement "${event.name}"` : ''} sera envoyé depuis notre plateforme avec un message personnalisé.</p>
-                </div>
-
-                <div className="flex flex-col gap-4 mt-8">
+                <div className="flex flex-row gap-4 mt-8">
                   <button
                     type="submit"
                     disabled={isSubmitting}
@@ -937,6 +1030,30 @@ export default function EventQRPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Clavier virtuel */}
+              {showVirtualKeyboard && (
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--primary-color)' }}>
+                      Clavier virtuel - {currentInputField === 'name' ? 'Votre nom' : 'Votre email'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={closeVirtualKeyboard}
+                      className="text-gray-500 hover:text-gray-700 text-xl"
+                    >
+                      ✖️
+                    </button>
+                  </div>
+                  <VirtualKeyboard
+                    onChange={handleVirtualKeyboardChange}
+                    value={formData[currentInputField]}
+                    placeholder={currentInputField === 'name' ? 'Entrez votre nom' : 'votre@email.com'}
+                    theme="hg-theme-default"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

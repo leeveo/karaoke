@@ -132,22 +132,35 @@ export default function EventKaraokePage() {
             // Précharger la vidéo avant de la montrer
             if (preloadRef.current) {
               preloadRef.current.src = s3Url;
-              preloadRef.current.load();
+              
+              // Timeout pour éviter d'attendre indéfiniment
+              const preloadTimeout = setTimeout(() => {
+                console.log("Timeout de préchargement - continuation sans préchargement");
+                setVideoReady(true);
+                setLoading(false);
+              }, 8000); // 8 secondes max
               
               // Attendre que la vidéo soit prête
               preloadRef.current.oncanplaythrough = () => {
                 console.log("Vidéo préchargée avec succès");
+                clearTimeout(preloadTimeout);
                 setVideoReady(true);
                 setLoading(false);
               };
               
-              preloadRef.current.onerror = (e) => {
-                console.error("Erreur lors du préchargement de la vidéo:", e);
-                setError("Impossible de précharger la vidéo");
+              // En cas d'erreur, continuer quand même (mode tolérant)
+              preloadRef.current.onerror = () => {
+                console.warn("Préchargement impossible, continuation directe...");
+                clearTimeout(preloadTimeout);
+                setVideoReady(true); // Continuer quand même
                 setLoading(false);
               };
+              
+              // Charger la vidéo
+              preloadRef.current.load();
             } else {
               // Pas de référence - continuer sans préchargement
+              setVideoReady(true);
               setLoading(false);
             }
           } else {
@@ -329,7 +342,8 @@ export default function EventKaraokePage() {
                 <div className="border-4 border-gray-400 rounded-lg shadow-lg overflow-hidden m-8">
                   <LiveKaraokeRecorder 
                     karaokeSrc={videoUrl} 
-                    eventId={id as string} 
+                    eventId={id as string}
+                    logoUrl={event?.customization?.logoUrl}
                     buttonStyles={{
                       className: "mt-4 text-white font-bold py-5 px-10 rounded-xl shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 text-xl uppercase tracking-wider flex items-center justify-center mx-auto border border-white/20",
                       icon: "🎵",

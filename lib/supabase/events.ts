@@ -50,14 +50,21 @@ export async function fetchEventById(id: string): Promise<Event> {
     
     // Traiter le logo si il existe
     if (event.customization.logo) {
+      console.log("Processing logo for event:", id, "Logo filename:", event.customization.logo);
       const logoUrlResult = supabase.storage
         .from('karaokestorage')
         .getPublicUrl(`logos/${event.customization.logo}`);
       
       if (logoUrlResult.data?.publicUrl) {
-        event.customization.logoUrl = logoUrlResult.data.publicUrl;
+        // Ajouter un timestamp pour forcer le rechargement en cas de mise à jour
+        const cacheBuster = `?t=${Date.now()}`;
+        event.customization.logoUrl = logoUrlResult.data.publicUrl + cacheBuster;
         console.log("Logo URL generated:", event.customization.logoUrl);
+      } else {
+        console.warn("Failed to generate logo URL for:", event.customization.logo);
       }
+    } else {
+      console.log("No logo configured for event:", id);
     }
   }
   
