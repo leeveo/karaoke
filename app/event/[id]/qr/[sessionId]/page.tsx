@@ -15,58 +15,49 @@ export default function EventQRPage() {
   const [pageUrl, setPageUrl] = useState<string | null>(searchParams.get('pageUrl'));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<EventType | null>(null);
-  const [isOnline, setIsOnline] = useState(true);
+  
+  // Détection du mode offline via variable d'environnement OU localStorage (pour tests)
+  const isOfflinePackage = process.env.NEXT_PUBLIC_OFFLINE_MODE === 'true' || 
+                           (typeof window !== 'undefined' && localStorage.getItem('forceOfflineMode') === 'true');
+  
+  const [isOnline, setIsOnline] = useState(!isOfflinePackage);
   const router = useRouter();
   
-  // Détecter si on est VRAIMENT online (pas juste navigator.onLine qui peut être faux en Electron)
+  // Log pour debugging
   useEffect(() => {
-    const checkRealOnlineStatus = async () => {
-      try {
-        // Test avec une requête HEAD légère vers notre propre serveur
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
-        
-        await fetch('/api/send-email', {
-          method: 'HEAD',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        // Si on arrive ici sans erreur, on est online
+    console.log('[QR Page] Mode offline package:', isOfflinePackage);
+    console.log('[QR Page] État initial isOnline:', !isOfflinePackage);
+    console.log('[QR Page] navigator.onLine:', navigator.onLine);
+    if (isOfflinePackage) {
+      console.log('🔴 MODE OFFLINE FORCÉ - Les emails seront stockés dans IndexedDB');
+    }
+  }, [isOfflinePackage]);
+  
+  // Surveillance de la connectivité réseau (en plus du mode offline package)
+  useEffect(() => {
+    // Si on est en mode offline package, ne pas chercher à détecter en ligne
+    if (isOfflinePackage) {
+      console.log('[Online Check] Mode offline package détecté, utiliser navigator.onLine pour statut');
+      setIsOnline(navigator.onLine);
+      
+      const handleOnline = () => {
+        console.log('[Online Check] Event online détecté');
         setIsOnline(true);
-        console.log('[Online Check] ✓ API accessible, mode ONLINE');
-      } catch {
-        // Si fetch échoue (timeout, network error, etc), on est offline
+      };
+      const handleOffline = () => {
+        console.log('[Online Check] Event offline détecté');
         setIsOnline(false);
-        console.log('[Online Check] ✗ API non accessible, mode OFFLINE');
-      }
-    };
+      };
 
-    // Vérifier immédiatement
-    checkRealOnlineStatus();
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
 
-    // Re-vérifier toutes les 10 secondes
-    const interval = setInterval(checkRealOnlineStatus, 10000);
-
-    // Écouter aussi les événements online/offline du navigateur
-    const handleOnline = () => {
-      console.log('[Online Check] Event online détecté');
-      checkRealOnlineStatus();
-    };
-    const handleOffline = () => {
-      console.log('[Online Check] Event offline détecté');
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, [isOfflinePackage]);
 
   // Charger l'événement et ses personnalisations
   useEffect(() => {
@@ -369,35 +360,52 @@ export default function EventQRPage() {
   const sendEmail = async (videoUrl?: string) => {
     try {
       const finalUrl = videoUrl || pageUrl;
+      
+      console.log('=== DÉBUT sendEmail ===');
+      console.log('[sendEmail] isOnline:', isOnline);
+      console.log('[sendEmail] finalUrl:', finalUrl);
+      console.log('[sendEmail] finalUrl startsWith blob?', finalUrl?.startsWith('blob:'));
+      console.log('[sendEmail] Condition offline:', !isOnline && finalUrl?.startsWith('blob:'));
 
       // MODE OFFLINE: Sauvegarder dans IndexedDB pour envoi ultérieur
       if (!isOnline && finalUrl?.startsWith('blob:')) {
-        console.log('[sendEmail] Mode offline détecté - sauvegarde dans IndexedDB');
+        console.log('🔴 [sendEmail] Mode offline détecté - sauvegarde dans IndexedDB');
+        console.log('[sendEmail] FormData:', { email: formData.email, name: formData.name });
         
-        // Récupérer le blob depuis l'URL blob
-        const response = await fetch(finalUrl);
-        const videoBlob = await response.blob();
-        
-        // Sauvegarder dans IndexedDB
-        await pendingEmailStore.savePendingEmail({
-          id: `${sessionId}-${Date.now()}`,
-          videoBlob: videoBlob,
-          email: formData.email,
-          name: formData.name,
-          subject: formData.subject || 'Votre performance karaoké 🎤',
-          message: formData.message || '',
-          sessionId: sessionId as string,
-          eventId: id as string,
-          createdAt: Date.now(),
-          retries: 0
-        });
-        
-        console.log('[sendEmail] ✓ Email sauvegardé dans IndexedDB pour synchronisation ultérieure');
-        return { success: true, offline: true };
+        try {
+          // Récupérer le blob depuis l'URL blob
+          console.log('[sendEmail] Fetching blob from URL...');
+          const response = await fetch(finalUrl);
+          const videoBlob = await response.blob();
+          console.log('[sendEmail] ✓ Blob récupéré, taille:', videoBlob.size, 'bytes');
+          
+          // Sauvegarder dans IndexedDB
+          const pendingEmailData = {
+            id: `${sessionId}-${Date.now()}`,
+            videoBlob: videoBlob,
+            email: formData.email,
+            name: formData.name,
+            subject: formData.subject || 'Votre performance karaoké 🎤',
+            message: formData.message || '',
+            sessionId: sessionId as string,
+            eventId: id as string,
+            createdAt: Date.now(),
+            retries: 0
+          };
+          
+          console.log('[sendEmail] Sauvegarde dans IndexedDB avec ID:', pendingEmailData.id);
+          await pendingEmailStore.savePendingEmail(pendingEmailData);
+          
+          console.log('✅ [sendEmail] Email et vidéo sauvegardés dans IndexedDB pour synchronisation ultérieure');
+          return { success: true, offline: true };
+        } catch (dbError) {
+          console.error('❌ [sendEmail] Erreur lors de la sauvegarde IndexedDB:', dbError);
+          throw dbError;
+        }
       }
 
       // MODE ONLINE: Envoyer directement via API
-      console.log('[sendEmail] Mode online - envoi via API');
+      console.log('🌐 [sendEmail] Mode online - envoi via API');
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -421,7 +429,7 @@ export default function EventQRPage() {
 
       return await response.json();
     } catch (error) {
-      console.error('Erreur d\'envoi d\'email:', error);
+      console.error('❌ [sendEmail] Erreur d\'envoi d\'email:', error);
       throw error;
     }
   };
