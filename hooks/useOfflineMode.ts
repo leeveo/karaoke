@@ -6,6 +6,7 @@ import {
   getOfflineEvent,
   storeOfflineSong,
   getOfflineSongsByCategory,
+  getOfflineSongByKey,
   storeRecordedVideo,
   getRecordedVideo,
   getPendingVideos,
@@ -47,6 +48,10 @@ export function useIndexedDB() {
     return await getOfflineSongsByCategory(categoryId);
   }, []);
 
+  const loadOfflineSongByKey = useCallback(async (key: string) => {
+    return await getOfflineSongByKey(key);
+  }, []);
+
   const saveRecordedVideo = useCallback(async (video: RecordedVideo) => {
     await storeRecordedVideo(video);
   }, []);
@@ -76,6 +81,7 @@ export function useIndexedDB() {
     loadOfflineEvent,
     saveOfflineSong,
     loadOfflineSongsByCategory,
+    loadOfflineSongByKey,
     saveRecordedVideo,
     loadRecordedVideo,
     loadPendingVideos,

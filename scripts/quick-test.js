@@ -115,10 +115,20 @@ async function main() {
   // 5. Copier le dossier public
   const publicDir = path.join(ROOT, 'public');
   const testPublic = path.join(TEST_DIR, 'public');
-  if (fileExists(publicDir) && (!fileExists(testPublic) || forceRebuild)) {
-    log('📦 Copie du dossier public...');
-    copyDirSync(publicDir, testPublic);
-    log('   ✓ public/');
+  if (fileExists(publicDir)) {
+    if (!fileExists(testPublic) || forceRebuild) {
+      log('📦 Copie du dossier public...');
+      copyDirSync(publicDir, testPublic);
+      log('   ✓ public/');
+    }
+
+    // Always refresh critical service worker to pick up cache tweaks
+    const swSource = path.join(publicDir, 'offline-worker.js');
+    const swDest = path.join(testPublic, 'offline-worker.js');
+    if (fileExists(swSource)) {
+      copyFileSync(swSource, swDest);
+      log('   ↺ offline-worker.js mis à jour');
+    }
   }
 
   // 6. Vérifier si offline-data existe
@@ -158,50 +168,11 @@ async function main() {
     execSync('npm install electron@33.0.0', { stdio: 'inherit', cwd: TEST_DIR });
   }
 
-  // 8. Lancer Electron
   log('');
-  log('🚀 Lancement d\'Electron...');
+  log('📍 Étapes suivantes:');
+  log('   1. cd .packages/test-offline');
+  log('   2. Lancer LANCER-KARAOKE.bat pour tester offline');
   log('');
-  log('   Ctrl+C pour arrêter');
-  log('   DevTools: Ctrl+Shift+I dans la fenêtre Electron');
-  log('');
-
-  const electronPath = path.join(TEST_DIR, 'node_modules', '.bin', 'electron.cmd');
-  const electronMain = path.join(TEST_DIR, 'electron', 'main.js');
-
-  if (!fileExists(electronPath)) {
-    log('⚠️  Electron non trouvé, installation...');
-    execSync('npm install electron --save-dev', { stdio: 'inherit', cwd: TEST_DIR });
-  }
-
-  // Lancer Electron - utiliser npx electron pour éviter les problèmes de chemin
-  log(`Chemin Electron: ${electronPath}`);
-  log(`Main Electron: ${electronMain}`);
-  
-  const electronProcess = spawn(
-    'npx',
-    ['electron', electronMain],
-    {
-      cwd: TEST_DIR,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        ELECTRON_ENABLE_LOGGING: '1',
-        NODE_ENV: 'production',
-      },
-      shell: true,
-    }
-  );
-
-  electronProcess.on('close', (code) => {
-    log(`Electron fermé avec le code: ${code}`);
-    process.exit(code);
-  });
-
-  electronProcess.on('error', (err) => {
-    log(`Erreur Electron: ${err.message}`);
-    process.exit(1);
-  });
 }
 
 main().catch((err) => {

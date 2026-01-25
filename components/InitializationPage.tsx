@@ -63,26 +63,42 @@ export default function InitializationPage({ eventId }: InitializationPageProps)
         }
 
         setStatus('downloading');
-        setCurrentFile(`Téléchargement: ${missingAssets.length} fichiers manquants...`);
+        const concurrencyLimit = getDownloadConcurrency(missingAssets.length);
+        setEstimatedTime(calculateEstimatedTime(missingAssets.length, concurrencyLimit));
+        setCurrentFile(`Téléchargement: ${missingAssets.length} fichiers manquants (lot de ${concurrencyLimit})...`);
+        setDownloadedAssets(0);
 
-        // 2. Download missing assets in parallel
+        // 2. Download missing assets with controlled concurrency
         let downloaded = 0;
-        const downloadPromises = missingAssets.map(async (asset) => {
-          try {
-            setCurrentFile(`Téléchargement: ${asset.title || asset.id}...`);
-            const blob = await fetchWithRetry(asset.url);
-            await saveAssetToIDB(eventId, { ...asset, blob });
-            
-            downloaded++;
-            setDownloadedAssets(downloaded);
-            setProgress(Math.round((downloaded / missingAssets.length) * 100));
-          } catch (error) {
-            console.error(`Failed to download ${asset.id}:`, error);
-            // Continue with other assets
+        let pointer = 0;
+
+        const workers = Array.from({ length: concurrencyLimit }, async () => {
+          while (true) {
+            const currentIndex = pointer++;
+            if (currentIndex >= missingAssets.length) {
+              break;
+            }
+
+            const asset = missingAssets[currentIndex];
+            try {
+              setCurrentFile(`Téléchargement (${currentIndex + 1}/${missingAssets.length}): ${asset.title || asset.id}...`);
+              const blob = await fetchWithRetry(asset.url);
+              await saveAssetToIDB(eventId, { ...asset, blob });
+
+              downloaded += 1;
+              setDownloadedAssets(downloaded);
+              setProgress(Math.round((downloaded / missingAssets.length) * 100));
+            } catch (error) {
+              console.error(`Failed to download ${asset.id}:`, error);
+            }
+
+            if (pointer < missingAssets.length) {
+              await throttleDelay();
+            }
           }
         });
 
-        await Promise.allSettled(downloadPromises);
+        await Promise.all(workers);
 
         setProgress(100);
         setStatus('complete');
@@ -311,10 +327,11 @@ async function openIDB(): Promise<IDBDatabase> {
   });
 }
 
-function calculateEstimatedTime(fileCount: number): string {
+function calculateEstimatedTime(fileCount: number, concurrency = 1): string {
   // Assume average 2MB/s download speed
   const avgFileSize = 10; // 10 MB per song
-  const estimatedSeconds = (fileCount * avgFileSize) / 2;
+  const effectiveConcurrency = Math.max(concurrency, 1);
+  const estimatedSeconds = ((fileCount * avgFileSize) / 2) / effectiveConcurrency;
   
   if (estimatedSeconds < 60) {
     return `${Math.round(estimatedSeconds)}s`;
@@ -325,4 +342,19 @@ function calculateEstimatedTime(fileCount: number): string {
     const mins = Math.round((estimatedSeconds % 3600) / 60);
     return `${hours}h ${mins}min`;
   }
+}
+
+function getDownloadConcurrency(totalAssets: number): number {
+  // Favor small bursts while keeping bandwidth under control
+  if (totalAssets <= 2) {
+    return 1;
+  }
+  if (totalAssets <= 6) {
+    return 2;
+  }
+  return 3;
+}
+
+function throttleDelay(duration = 150): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, duration));
 }

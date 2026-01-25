@@ -54,7 +54,7 @@ export interface SyncStatus {
 }
 
 const DB_NAME = 'karaoke-offline-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let db: IDBPDatabase | null = null;
 
@@ -65,29 +65,31 @@ export async function initDB(): Promise<IDBPDatabase> {
   if (db) return db;
 
   db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Store 1: Offline Events
-      if (!db.objectStoreNames.contains('offlineEvents')) {
-        db.createObjectStore('offlineEvents', { keyPath: 'id' });
-      }
+    upgrade(upgradeDb, oldVersion, _newVersion, transaction) {
+      if (oldVersion < 1) {
+        // Store 1: Offline Events
+        upgradeDb.createObjectStore('offlineEvents', { keyPath: 'id' });
 
-      // Store 2: Offline Songs
-      if (!db.objectStoreNames.contains('offlineSongs')) {
-        const songStore = db.createObjectStore('offlineSongs', { keyPath: 'id' });
+        // Store 2: Offline Songs
+        const songStore = upgradeDb.createObjectStore('offlineSongs', { keyPath: 'id' });
         songStore.createIndex('categoryId', 'categoryId', { unique: false });
-      }
+        songStore.createIndex('key', 'key', { unique: false });
 
-      // Store 3: Recorded Videos
-      if (!db.objectStoreNames.contains('recordedVideos')) {
-        const videoStore = db.createObjectStore('recordedVideos', { keyPath: 'id' });
+        // Store 3: Recorded Videos
+        const videoStore = upgradeDb.createObjectStore('recordedVideos', { keyPath: 'id' });
         videoStore.createIndex('status', 'status', { unique: false });
         videoStore.createIndex('userEmail', 'userEmail', { unique: false });
         videoStore.createIndex('sessionId', 'sessionId', { unique: false });
+
+        // Store 4: Sync Status
+        upgradeDb.createObjectStore('syncStatus', { keyPath: 'eventId' });
       }
 
-      // Store 4: Sync Status
-      if (!db.objectStoreNames.contains('syncStatus')) {
-        db.createObjectStore('syncStatus', { keyPath: 'eventId' });
+      if (oldVersion < 2) {
+        const songStore = transaction.objectStore('offlineSongs');
+        if (!songStore.indexNames.contains('key')) {
+          songStore.createIndex('key', 'key', { unique: false });
+        }
       }
     },
   });
@@ -153,25 +155,39 @@ export async function getOfflineSongsByCategory(categoryId: string): Promise<Off
   return database.getAllFromIndex('offlineSongs', 'categoryId', categoryId);
 }
 
+export async function getOfflineSongByKey(songKey: string): Promise<OfflineSong | undefined> {
+  const database = await getDB();
+  try {
+    const index = database.transaction('offlineSongs', 'readonly').store.index('key');
+    const normalized = songKey.trim();
+    const found = await index.get(normalized);
+    if (found) {
+      return found;
+    }
+
+    // Fallback: try without prefix
+    const fallbackKey = normalized.includes('/') ? normalized.split('/').pop() ?? normalized : normalized;
+    const cursor = await index.openCursor();
+    while (cursor) {
+      if (cursor.value.key?.endsWith(fallbackKey)) {
+        return cursor.value as OfflineSong;
+      }
+      await cursor.continue();
+    }
+  } catch (error) {
+    console.warn('[offline/db] Unable to use key index, falling back to scan:', error);
+    const allSongs = await database.getAll('offlineSongs');
+    return allSongs.find((song) => song.key === songKey || song.key?.endsWith(songKey));
+  }
+  return undefined;
+}
+
 /**
  * Get offline song by ID
  */
 export async function getOfflineSong(songId: string): Promise<OfflineSong | undefined> {
   const database = await getDB();
   return database.get('offlineSongs', songId);
-}
-
-/**
- * Delete offline songs for event
- */
-export async function deleteOfflineSongsForEvent(eventId: string): Promise<void> {
-  const database = await getDB();
-  const allSongs = await database.getAll('offlineSongs');
-  const songsToDelete = allSongs.filter(song => song.id.startsWith(eventId));
-  
-  for (const song of songsToDelete) {
-    await database.delete('offlineSongs', song.id);
-  }
 }
 
 /**

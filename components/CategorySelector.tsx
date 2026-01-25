@@ -125,6 +125,7 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const desktopSlidesPerView = 3.5;
 
   useEffect(() => {
     async function fetchCategories() {
@@ -227,6 +228,15 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
     );
   }
 
+  const minimumSlidesForLoop = Math.ceil(desktopSlidesPerView) + 1; // need enough slides to wrap smoothly
+  const shouldLoop = categories.length >= minimumSlidesForLoop;
+  const autoplayOptions = categories.length > 1
+    ? {
+        delay: 3500,
+        disableOnInteraction: false,
+      }
+    : false;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -237,13 +247,10 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
         effect={'coverflow'}
         grabCursor={true}
         centeredSlides={true}
-        slidesPerView={3.5}
+        slidesPerView={desktopSlidesPerView}
         spaceBetween={20}
-        loop={true}
-        autoplay={{
-          delay: 3500,
-          disableOnInteraction: false,
-        }}
+        loop={shouldLoop}
+        autoplay={autoplayOptions}
         coverflowEffect={{
           rotate: 5,
           stretch: 0,

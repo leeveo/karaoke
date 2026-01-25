@@ -74,9 +74,9 @@ self.addEventListener('fetch', (event) => {
   else if (isImageRequest(url)) {
     event.respondWith(cacheFirstStrategy(request, IMAGES_CACHE, IMAGE_EXTENSIONS));
   }
-  // Videos from S3 - network-first but cache aggressively
+  // Videos from S3 - stream aware handling with cache fallback
   else if (isVideoRequest(url)) {
-    event.respondWith(networkFirstStrategy(request, VIDEOS_CACHE, VIDEO_EXTENSIONS));
+    event.respondWith(handleVideoRequest(request));
   }
   // Static assets - cache first
   else if (
@@ -122,19 +122,8 @@ async function networkFirstStrategy(request, cacheName = CACHE_NAME, extensions 
     // Cache successful GET responses
     if (response.ok && request.method === 'GET') {
       const cache = await caches.open(cacheName);
-      
-      // Store metadata about cache time
-      const clonedResponse = response.clone();
-      const headers = new Headers(clonedResponse.headers);
-      headers.append('X-Cache-Time', new Date().toISOString());
-      
-      const newResponse = new Response(clonedResponse.body, {
-        status: clonedResponse.status,
-        statusText: clonedResponse.statusText,
-        headers: headers
-      });
-      
-      cache.put(request, newResponse);
+      const stampedResponse = createStampedResponse(response.clone());
+      cache.put(request, stampedResponse);
     }
 
     return response;
@@ -147,10 +136,7 @@ async function networkFirstStrategy(request, cacheName = CACHE_NAME, extensions 
       return cached;
     }
 
-    return new Response('Offline - Resource not available', {
-      status: 503,
-      statusText: 'Service Unavailable',
-    });
+    return offlineUnavailable();
   }
 }
 
@@ -190,18 +176,8 @@ async function cacheFirstStrategy(request, cacheName = CACHE_NAME, extensions = 
 
     if (response.ok && request.method === 'GET') {
       const cache = await caches.open(cacheName);
-      
-      const clonedResponse = response.clone();
-      const headers = new Headers(clonedResponse.headers);
-      headers.append('X-Cache-Time', new Date().toISOString());
-      
-      const newResponse = new Response(clonedResponse.body, {
-        status: clonedResponse.status,
-        statusText: clonedResponse.statusText,
-        headers: headers
-      });
-      
-      cache.put(request, newResponse);
+      const stampedResponse = createStampedResponse(response.clone());
+      cache.put(request, stampedResponse);
       console.log('[ServiceWorker] Cached:', request.url);
     }
 
@@ -215,11 +191,128 @@ async function cacheFirstStrategy(request, cacheName = CACHE_NAME, extensions = 
       return cached;
     }
 
-    return new Response('Offline - Resource not available', {
-      status: 503,
-      statusText: 'Service Unavailable',
+    return offlineUnavailable();
+  }
+}
+
+/**
+ * Stream-aware handler for video requests with range support
+ * @param {Request} request
+ */
+async function handleVideoRequest(request) {
+  const rangeHeader = request.headers.get('range');
+  const cache = await caches.open(VIDEOS_CACHE);
+
+  if (!rangeHeader) {
+    try {
+      const networkResponse = await fetch(request);
+
+      if (networkResponse.ok && request.method === 'GET') {
+        const stampedResponse = createStampedResponse(networkResponse.clone());
+        await cache.put(new Request(request.url), stampedResponse);
+      }
+
+      return networkResponse;
+    } catch (error) {
+      console.log('[ServiceWorker] Video network miss, using cache:', request.url);
+      const cached = await cache.match(request.url);
+      if (cached) {
+        return cached;
+      }
+      return offlineUnavailable();
+    }
+  }
+
+  // Range request handling
+  try {
+    const rangeResponse = await fetch(request);
+    if (rangeResponse && rangeResponse.status === 206) {
+      return rangeResponse;
+    }
+  } catch (error) {
+    console.log('[ServiceWorker] Range fetch failed, falling back to cache:', request.url);
+  }
+
+  const cachedResponse = await cache.match(request.url);
+  if (!cachedResponse) {
+    return offlineUnavailable();
+  }
+
+  const totalSize = Number(cachedResponse.headers.get('Content-Length')) || (await cachedResponse.clone().blob()).size;
+  const byteRange = parseRangeHeader(rangeHeader, totalSize);
+  if (!byteRange) {
+    return new Response(null, {
+      status: 416,
+      statusText: 'Range Not Satisfiable',
+      headers: {
+        'Content-Range': `bytes */${totalSize}`,
+      },
     });
   }
+
+  const { start, end } = byteRange;
+  const cachedBlob = await cachedResponse.clone().blob();
+  const slicedBlob = cachedBlob.slice(start, end + 1);
+
+  return new Response(slicedBlob, {
+    status: 206,
+    statusText: 'Partial Content',
+    headers: {
+      'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': String(slicedBlob.size),
+      'Content-Type': cachedResponse.headers.get('Content-Type') || 'video/mp4',
+    },
+  });
+}
+
+/**
+ * Create response copy with cache timestamp header
+ * @param {Response} response
+ */
+function createStampedResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set('X-Cache-Time', new Date().toISOString());
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+/**
+ * Parse HTTP range header into byte positions
+ * @param {string} rangeHeader
+ * @param {number} totalSize
+ */
+function parseRangeHeader(rangeHeader, totalSize) {
+  if (!rangeHeader || !rangeHeader.startsWith('bytes=')) {
+    return null;
+  }
+
+  const ranges = rangeHeader.replace('bytes=', '').split('-');
+  const start = Number(ranges[0]);
+  const end = ranges[1] ? Number(ranges[1]) : totalSize - 1;
+
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= totalSize) {
+    return null;
+  }
+
+  return {
+    start,
+    end: Math.min(end, totalSize - 1),
+  };
+}
+
+/**
+ * Shared offline fallback response
+ */
+function offlineUnavailable() {
+  return new Response('Offline - Resource not available', {
+    status: 503,
+    statusText: 'Service Unavailable',
+  });
 }
 
 /**

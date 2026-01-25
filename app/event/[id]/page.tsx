@@ -374,7 +374,8 @@ function EventPageContent() {
                 alt={`${event.name} Logo`} 
                 width={200}
                 height={200}
-                className="max-w-full max-h-full object-contain"
+                className="object-contain"
+                style={{ width: '100%', height: 'auto', maxHeight: '100%' }}
               />
             )}
           </div>

@@ -8,6 +8,29 @@ import { Event } from '@/types/event';
 import { useOnlineStatus, useIndexedDB } from '@/hooks/useOfflineMode';
 import { loadEventWithOfflineFallback, getOfflineVideoUrlFromManifest, isOfflinePackage } from '@/lib/offline/eventLoader';
 
+const LOADER_FAILSAFE_MS = 7000;
+const MANIFEST_LOOKUP_TIMEOUT_MS = 2500;
+const INDEXED_DB_TIMEOUT_MS = 3000;
+const SIGNED_URL_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timeout après ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
   const decodedSongId = decodeURIComponent(songId as string);
@@ -20,10 +43,34 @@ export default function EventKaraokePage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [bgLoaded, setBgLoaded] = useState(false);
   const isOnline = useOnlineStatus();
-  const { loadOfflineSongsByCategory } = useIndexedDB();
+  const { loadOfflineSongsByCategory, loadOfflineSongByKey } = useIndexedDB();
+  const loaderFailsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
   
   // Extraire le nom de la chanson à partir de l'ID
   const songName = decodedSongId.split('/').pop()?.split('.')[0] || decodedSongId;
+
+  const logLoader = (message: string, extra?: unknown) => {
+    if (extra !== undefined) {
+      console.log(`[EventKaraoke][Loader] ${message}`, extra);
+      return;
+    }
+    console.log(`[EventKaraoke][Loader] ${message}`);
+  };
+
+  const clearLoaderFailsafe = () => {
+    if (loaderFailsafeRef.current) {
+      clearTimeout(loaderFailsafeRef.current);
+      loaderFailsafeRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      clearLoaderFailsafe();
+    };
+  }, []);
 
   // "Retour" button handler - Make sure to include the event ID
   const handleReturn = () => {
@@ -80,126 +127,242 @@ export default function EventKaraokePage() {
     }
   }
 
+  const normalizeSongKey = (value: string) => {
+    if (!value) {
+      return value;
+    }
+    const trimmed = value.split('?')[0];
+    if (trimmed.includes('karaokesaas/')) {
+      return trimmed.slice(trimmed.indexOf('karaokesaas/'));
+    }
+    try {
+      const url = new URL(trimmed);
+      return url.pathname.replace(/^\/+/, '');
+    } catch {
+      return trimmed;
+    }
+  };
+
   // Move useEffect hooks to the top level
   useEffect(() => {
+    let cancelled = false;
+
+    const safeStateUpdate = (updater: () => void) => {
+      if (cancelled || !isMountedRef.current) {
+        return;
+      }
+      updater();
+    };
+
+    const startLoaderFailsafe = (context: string) => {
+      clearLoaderFailsafe();
+      loaderFailsafeRef.current = setTimeout(() => {
+        if (cancelled || !isMountedRef.current) {
+          return;
+        }
+        logLoader(`Failsafe déclenché (${context}) - affichage forcé de l'interface`);
+        setVideoReady(true);
+        setLoading(false);
+      }, LOADER_FAILSAFE_MS);
+    };
+
     async function loadVideo() {
       try {
-        setLoading(true);
-        setVideoReady(false);
-        
-        // 🔌 Mode Kiosk Electron: charger depuis le manifest offline en priorité
+        logLoader('Démarrage du chargement', { song: decodedSongId });
+        safeStateUpdate(() => {
+          setLoading(true);
+          setVideoReady(false);
+          setError(null);
+        });
+
+        startLoaderFailsafe(`chargement initial ${decodedSongId}`);
+
         const isKioskMode = isOfflinePackage();
+        const normalizedKey = normalizeSongKey(decodedSongId);
+        logLoader('Paramètres réseau', { kiosk: isKioskMode, online: isOnline, key: normalizedKey });
+
         if (isKioskMode) {
-          console.log('[EventKaraoke] 🔌 Mode Kiosk détecté - chargement vidéo depuis manifest offline');
-          const offlineVideoUrl = await getOfflineVideoUrlFromManifest(decodedSongId);
-          if (offlineVideoUrl) {
-            console.log('[EventKaraoke] ✅ Vidéo offline trouvée:', offlineVideoUrl);
-            setVideoUrl(offlineVideoUrl);
-            setVideoReady(true);
-            setLoading(false);
-            return;
-          }
-          console.warn('[EventKaraoke] ⚠️ Vidéo non trouvée dans manifest, tentative IndexedDB...');
-        }
-        
-        // If offline (navigator.onLine false or kiosk mode), try to load from IndexedDB
-        if (!isOnline || isKioskMode) {
-          console.log('[EventKaraoke] Offline mode - trying IndexedDB');
+          logLoader('Mode kiosk actif - tentative manifest offline');
           try {
-            // For offline, we need to get the song from IndexedDB
-            // The songId format is category/filename.ext or just the key
-            const songKey = decodedSongId.split('/').pop() || decodedSongId;
-            
-            // Try to find the song in any category (we'll search them all)
-            const categories = ['all', 'anglais', 'francais', 'hip-hop', 'pop', 'rap', 'rock'];
-            let foundSong = null;
-            
-            for (const category of categories) {
-              const songs = await loadOfflineSongsByCategory(category);
-              foundSong = songs.find(s => s.key === songKey || s.key.includes(songKey));
-              if (foundSong) break;
-            }
-            
-            if (foundSong && foundSong.blob) {
-              const blobUrl = URL.createObjectURL(foundSong.blob);
-              console.log('[EventKaraoke] Loaded song from IndexedDB:', foundSong.title);
-              setVideoUrl(blobUrl);
-              setVideoReady(true);
-              setLoading(false);
+            const offlineVideoUrl = await withTimeout(
+              getOfflineVideoUrlFromManifest(decodedSongId),
+              MANIFEST_LOOKUP_TIMEOUT_MS,
+              'Manifest offline'
+            );
+            if (offlineVideoUrl) {
+              logLoader('Vidéo trouvée dans le manifest offline');
+              safeStateUpdate(() => {
+                setVideoUrl(offlineVideoUrl);
+                setVideoReady(true);
+                setLoading(false);
+              });
+              clearLoaderFailsafe();
               return;
-            } else {
-              console.warn('[EventKaraoke] Song not found in IndexedDB:', songKey);
             }
-          } catch (offlineErr) {
-            console.error('[EventKaraoke] Error loading from IndexedDB:', offlineErr);
+            logLoader('Manifest offline ne contient pas cette vidéo');
+          } catch (manifestErr) {
+            logLoader('Manifest offline indisponible', manifestErr);
           }
         }
-        
-        // Vérifier si c'est un chemin local ou un chemin S3
-        if (decodedSongId.startsWith('karaokesaas/')) {
-          // C'est une chanson S3, il faut obtenir l'URL signée
-          console.log("Chargement depuis S3:", decodedSongId);
-          const s3Url = await getSongUrl(decodedSongId);
-          
-          if (s3Url) {
-            console.log("URL S3 générée avec succès");
-            setVideoUrl(s3Url);
-            
-            // Précharger la vidéo avant de la montrer
-            if (preloadRef.current) {
-              preloadRef.current.src = s3Url;
-              
-              // Timeout pour éviter d'attendre indéfiniment
-              const preloadTimeout = setTimeout(() => {
-                console.log("Timeout de préchargement - continuation sans préchargement");
-                setVideoReady(true);
-                setLoading(false);
-              }, 8000); // 8 secondes max
-              
-              // Attendre que la vidéo soit prête
-              preloadRef.current.oncanplaythrough = () => {
-                console.log("Vidéo préchargée avec succès");
-                clearTimeout(preloadTimeout);
-                setVideoReady(true);
-                setLoading(false);
-              };
-              
-              // En cas d'erreur, continuer quand même (mode tolérant)
-              preloadRef.current.onerror = () => {
-                console.warn("Préchargement impossible, continuation directe...");
-                clearTimeout(preloadTimeout);
-                setVideoReady(true); // Continuer quand même
-                setLoading(false);
-              };
-              
-              // Charger la vidéo
-              preloadRef.current.load();
-            } else {
-              // Pas de référence - continuer sans préchargement
-              setVideoReady(true);
-              setLoading(false);
+
+        if (!isOnline || isKioskMode) {
+          logLoader('Mode offline détecté - tentative IndexedDB');
+          try {
+            let offlineSong = normalizedKey
+              ? await withTimeout(
+                  loadOfflineSongByKey(normalizedKey),
+                  INDEXED_DB_TIMEOUT_MS,
+                  'IndexedDB lookup'
+                )
+              : undefined;
+
+            if (!offlineSong && normalizedKey && normalizedKey.includes('/')) {
+              logLoader('Recherche directe échouée - fallback par catégories');
+              const fallbackKey = normalizedKey.split('/').pop() ?? normalizedKey;
+              const categories = ['all', 'anglais', 'francais', 'hip-hop', 'pop', 'rap', 'rock'];
+              for (const category of categories) {
+                try {
+                  const songs = await withTimeout(
+                    loadOfflineSongsByCategory(category),
+                    INDEXED_DB_TIMEOUT_MS,
+                    `IndexedDB catégorie ${category}`
+                  );
+                  const candidate = songs.find((s) => s.key?.endsWith(fallbackKey));
+                  if (candidate) {
+                    offlineSong = candidate;
+                    break;
+                  }
+                } catch (categoryErr) {
+                  logLoader(`Lecture catégorie ${category} impossible`, categoryErr);
+                }
+              }
             }
-          } else {
-            setError("Impossible de générer l'URL de la vidéo depuis S3");
-            setLoading(false);
+
+            if (offlineSong && offlineSong.blob) {
+              logLoader('Lecture IndexedDB réussie', { title: offlineSong.title });
+              const blobUrl = URL.createObjectURL(offlineSong.blob);
+              safeStateUpdate(() => {
+                setVideoUrl(blobUrl);
+                setVideoReady(true);
+                setLoading(false);
+              });
+              clearLoaderFailsafe();
+              return;
+            }
+
+            logLoader('IndexedDB ne contient pas cette vidéo');
+          } catch (offlineErr) {
+            logLoader('Erreur IndexedDB', offlineErr);
+          }
+        }
+
+        if (normalizedKey.startsWith('karaokesaas/')) {
+          logLoader('Tentative de génération URL signée S3');
+          try {
+            const s3Url = await withTimeout(
+              getSongUrl(normalizedKey),
+              SIGNED_URL_TIMEOUT_MS,
+              'URL signée S3'
+            );
+
+            if (s3Url) {
+              logLoader('URL signée obtenue, lancement du préchargement');
+              safeStateUpdate(() => {
+                setVideoUrl(s3Url);
+              });
+
+              if (preloadRef.current) {
+                preloadRef.current.src = s3Url;
+
+                const preloadTimeout = setTimeout(() => {
+                  logLoader('Timeout préchargement vidéo - poursuite sans attendre');
+                  clearTimeout(preloadTimeout);
+                  safeStateUpdate(() => {
+                    setVideoReady(true);
+                    setLoading(false);
+                  });
+                  clearLoaderFailsafe();
+                }, SIGNED_URL_TIMEOUT_MS);
+
+                preloadRef.current.onloadeddata = () => {
+                  logLoader('Préchargement vidéo terminé (onloadeddata)');
+                  clearTimeout(preloadTimeout);
+                  safeStateUpdate(() => {
+                    setVideoReady(true);
+                    setLoading(false);
+                  });
+                  clearLoaderFailsafe();
+                };
+
+                preloadRef.current.onerror = (event) => {
+                  logLoader('Erreur de préchargement vidéo', event);
+                  clearTimeout(preloadTimeout);
+                  safeStateUpdate(() => {
+                    setVideoReady(true);
+                    setLoading(false);
+                  });
+                  clearLoaderFailsafe();
+                };
+
+                preloadRef.current.load();
+              } else {
+                logLoader('Référence vidéo indisponible - affichage immédiat');
+                safeStateUpdate(() => {
+                  setVideoReady(true);
+                  setLoading(false);
+                });
+                clearLoaderFailsafe();
+              }
+              return;
+            }
+
+            logLoader('URL S3 vide');
+          } catch (s3Error) {
+            logLoader("Impossible de récupérer l'URL S3", s3Error);
           }
         } else {
-          // Chemin local
           const localPath = `/songs/${decodedSongId}`;
-          setVideoUrl(localPath);
-          setVideoReady(true);
-          setLoading(false);
+          logLoader('Chargement via chemin local', { path: localPath });
+          safeStateUpdate(() => {
+            setVideoUrl(localPath);
+            setVideoReady(true);
+            setLoading(false);
+          });
+          clearLoaderFailsafe();
+          return;
         }
+
+        safeStateUpdate(() => {
+          setError('Impossible de charger la vidéo depuis les différentes sources.');
+          setLoading(false);
+        });
+        clearLoaderFailsafe();
       } catch (err) {
-        console.error("Erreur lors du chargement de la vidéo:", err);
-        setError(`Erreur lors du chargement de la vidéo: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-        setLoading(false);
+        logLoader('Erreur inattendue pendant le chargement', err);
+        safeStateUpdate(() => {
+          setError(`Erreur lors du chargement de la vidéo: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+          setLoading(false);
+        });
+        clearLoaderFailsafe();
       }
     }
 
     loadVideo();
+
+    return () => {
+      cancelled = true;
+      clearLoaderFailsafe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decodedSongId, isOnline]);
+
+  useEffect(() => {
+    return () => {
+      if (videoUrl && videoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, [videoUrl]);
 
   // Charger l'événement et appliquer le thème, même hors ligne
   useEffect(() => {

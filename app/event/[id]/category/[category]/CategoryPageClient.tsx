@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Song } from '@/services/s3Service';
 import { motion } from 'framer-motion';
 import { fetchEventById } from '@/lib/supabase/events';
@@ -303,9 +303,55 @@ export default function EventCategoryPageClient({
   const [songs, setSongs] = useState<Song[]>([]);
   const [event, setEvent] = useState<Event | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSongsLoading, setIsSongsLoading] = useState(true);
+  const [isImagePreloading, setIsImagePreloading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [imageProgress, setImageProgress] = useState({ loaded: 0, total: 0 });
+  const [imageRenderProgress, setImageRenderProgress] = useState({ loaded: 0, total: 0 });
+  const [animationsReady, setAnimationsReady] = useState(false);
+  const renderedImagesRef = useRef<Set<string>>(new Set());
+  const loaderStartRef = useRef<number | null>(null);
+  const renderFailsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const IMAGE_RENDER_FAILSAFE_MS = 3500;
+  const isLoading = isSongsLoading || isImagePreloading;
+  const totalImagesToLoad = imageRenderProgress.total || imageProgress.total;
+  const displayedImageLoaded = imageRenderProgress.total
+    ? imageRenderProgress.loaded
+    : imageProgress.loaded;
+  const loaderPercent = totalImagesToLoad
+    ? Math.min(100, Math.max(8, (displayedImageLoaded / totalImagesToLoad) * 100))
+    : 20;
+
+  const commitSongs = (nextSongs: Song[]) => {
+    setSongs(nextSongs);
+    setError(null);
+    setIsSongsLoading(false);
+    setIsImagePreloading(true);
+  };
+
+  const stopLoadingStates = () => {
+    setIsSongsLoading(false);
+    setIsImagePreloading(false);
+  };
+
+  const handleSlideImageRendered = (url?: string | null) => {
+    if (!url) {
+      return;
+    }
+
+    setImageRenderProgress((prev) => {
+      if (prev.total === 0 || renderedImagesRef.current.has(url)) {
+        return prev;
+      }
+
+      renderedImagesRef.current.add(url);
+
+      const nextLoaded = Math.min(prev.total, prev.loaded + 1);
+      console.log('[CategoryPage][Render] Image confirmée', { url, count: nextLoaded, target: prev.total });
+      return { ...prev, loaded: nextLoaded };
+    });
+  };
 
   // Récupérer les paramètres depuis Promise
   useEffect(() => {
@@ -315,10 +361,32 @@ export default function EventCategoryPageClient({
     });
   }, [params]);
 
+  useEffect(() => {
+    setAnimationsReady(true);
+  }, []);
+
   const setFallbackBackground = () => {
     document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
     setBgLoaded(true);
   };
+
+  useEffect(() => {
+    if (!isImagePreloading || imageRenderProgress.total === 0) {
+      return;
+    }
+
+    if (imageRenderProgress.loaded >= imageRenderProgress.total) {
+      const duration = loaderStartRef.current ? Date.now() - loaderStartRef.current : null;
+      console.log('[CategoryPage][Loader] Confirmation atteinte', {
+        loaded: imageRenderProgress.loaded,
+        target: imageRenderProgress.total,
+        durationMs: duration
+      });
+      loaderStartRef.current = null;
+      const handle = setTimeout(() => setIsImagePreloading(false), 200);
+      return () => clearTimeout(handle);
+    }
+  }, [imageRenderProgress, isImagePreloading]);
 
   const preloadBackgroundImage = (bgUrl: string) => {
     const img = new Image();
@@ -491,8 +559,15 @@ export default function EventCategoryPageClient({
   useEffect(() => {
     async function fetchSongs() {
       try {
+        if (!category) {
+          stopLoadingStates();
+          setSongs([]);
+          return;
+        }
+
         // Use local state instead of global loader
-        setIsLoading(true);
+        setIsSongsLoading(true);
+        setIsImagePreloading(true);
         if (category) {
           console.log(`[CategoryPage] Fetching songs for category: ${category}`);
           const s3FolderCategory = mapCategoryToS3Folder(category);
@@ -505,9 +580,7 @@ export default function EventCategoryPageClient({
             const manifestSongs = await loadSongsFromOfflineManifest(s3FolderCategory);
             if (manifestSongs && manifestSongs.length > 0) {
               console.log(`[CategoryPage] ✅ ${manifestSongs.length} chansons chargées depuis manifest`);
-              setSongs(manifestSongs);
-              setError(null);
-              // isLoading sera désactivé après le préchargement des images
+              commitSongs(manifestSongs);
               return;
             }
             // En mode kiosk, si le manifest échoue, essayer IndexedDB avant l'API online
@@ -522,9 +595,7 @@ export default function EventCategoryPageClient({
                 size: s.size,
                 imageUrl: s.imageUrl
               })) as Song[];
-              setSongs(formattedSongs);
-              setError(null);
-              // isLoading sera désactivé après le préchargement des images
+              commitSongs(formattedSongs);
               return;
             }
             // Dernier recours en mode kiosk: API locale (ne devrait pas arriver)
@@ -536,8 +607,7 @@ export default function EventCategoryPageClient({
             const cachedSongs = getSongsFromCache(s3FolderCategory);
             if (cachedSongs && cachedSongs.length > 0) {
               console.log(`[CategoryPage] 🚀 ${cachedSongs.length} chansons chargées depuis le cache`);
-              setSongs(cachedSongs);
-              setError(null);
+              commitSongs(cachedSongs);
               // isLoading sera désactivé après le préchargement des images
               return;
             }
@@ -567,9 +637,7 @@ export default function EventCategoryPageClient({
                 saveSongsToCache(s3FolderCategory, songList);
               }
               
-              setSongs(songList);
-              setError(null);
-              // isLoading sera désactivé après le préchargement des images
+              commitSongs(songList);
               return;
             }
           } catch (onlineErr) {
@@ -590,13 +658,11 @@ export default function EventCategoryPageClient({
               size: s.size,
               imageUrl: s.imageUrl
             })) as Song[];
-            setSongs(formattedSongs);
-            setError(null);
-            // isLoading sera désactivé après le préchargement des images
+            commitSongs(formattedSongs);
           } else {
             console.warn('[CategoryPage] Pas de chansons trouvées en offline');
             setError('Aucune chanson disponible (Besoin d\'internet pour charger ou télécharger des chansons)');
-            setIsLoading(false);
+            stopLoadingStates();
           }
         }
       } catch (err) {
@@ -616,9 +682,7 @@ export default function EventCategoryPageClient({
                 size: s.size,
                 imageUrl: s.imageUrl
               })) as Song[];
-              setSongs(formattedSongs);
-              setError(null);
-              // isLoading sera désactivé après le préchargement des images
+              commitSongs(formattedSongs);
               return;
             }
           }
@@ -627,39 +691,190 @@ export default function EventCategoryPageClient({
         }
         
         setError('Impossible de charger les chansons. Vérifiez votre connexion ou téléchargez des chansons en offline.');
-        setIsLoading(false);
+        stopLoadingStates();
       }
     }
 
     fetchSongs();
   }, [category, loadOfflineSongsByCategory]);
 
-  // Préchargement uniquement des premières images (visibles) pour un chargement rapide
+  // Précharger toutes les images nécessaires avant de permettre la sélection
+  // Optimisé: priorité aux premières images visibles, concurrence accrue
   useEffect(() => {
-    if (songs.length > 0 && isLoading) {
-      // Précharger les premières images visibles et attendre leur chargement
-      const imagesToPreload = songs.slice(0, 10); // 10 premières images
-      console.log(`[CategoryPage] ⏳ Préchargement de ${imagesToPreload.length} images avant affichage...`);
-      
-      const preloadPromises = imagesToPreload
-        .filter(song => song.imageUrl)
-        .map(song => {
-          return new Promise<void>((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve();
-            img.onerror = () => resolve(); // Résoudre même en cas d'erreur pour ne pas bloquer
-            img.src = song.imageUrl!;
-          });
-        });
-      
-      // Attendre le chargement de toutes les images (max 3 secondes)
-      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
-      Promise.race([Promise.all(preloadPromises), timeout]).then(() => {
-        console.log(`[CategoryPage] ✅ Images préchargées, affichage de la page`);
-        setIsLoading(false);
-      });
+    let cancelled = false;
+
+    if (!songs.length) {
+      loaderStartRef.current = null;
+      setIsImagePreloading(false);
+      setImageProgress({ loaded: 0, total: 0 });
+      setImageRenderProgress({ loaded: 0, total: 0 });
+      return;
     }
-  }, [songs, isLoading]);
+
+    const images = songs
+      .map((song, idx) => ({ url: song.imageUrl, priority: idx }))
+      .filter((item): item is { url: string; priority: number } => Boolean(item.url));
+
+    const uniqueImages = Array.from(
+      new Map(images.map((item) => [item.url, item])).values()
+    );
+
+    if (!uniqueImages.length) {
+      loaderStartRef.current = null;
+      setIsImagePreloading(false);
+      setImageProgress({ loaded: 0, total: 0 });
+      setImageRenderProgress({ loaded: 0, total: 0 });
+      return;
+    }
+
+    // Prioritize first 5 images (visible in carousel)
+    const priorityImages = uniqueImages.slice(0, 5);
+    const remainingImages = uniqueImages.slice(5);
+
+    const renderConfirmationTarget = Math.min(
+      uniqueImages.length,
+      Math.max(4, Math.min(16, Math.ceil(uniqueImages.length * 0.15)))
+    );
+
+    console.log('[CategoryPage][Images] Préchargement démarré', {
+      totalUnique: uniqueImages.length,
+      priority: priorityImages.length,
+      remaining: remainingImages.length,
+      renderTarget: renderConfirmationTarget
+    });
+
+    loaderStartRef.current = Date.now();
+
+    setIsImagePreloading(true);
+    setImageProgress({ loaded: 0, total: uniqueImages.length });
+    setImageRenderProgress({ loaded: 0, total: renderConfirmationTarget });
+    renderedImagesRef.current.clear();
+
+    const concurrency = 8; // Increased from 4 to 8 for faster loading
+    let loaded = 0;
+
+    const loadImage = (url: string) =>
+      new Promise<void>((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 2;
+
+        const finalize = () => {
+          loaded += 1;
+          if (!cancelled) {
+            setImageProgress({ loaded, total: uniqueImages.length });
+          }
+          resolve();
+        };
+
+        const attemptLoad = () => {
+          const img = new Image();
+          img.decoding = 'async'; // Enable async decoding
+          img.onload = finalize;
+          img.onerror = () => {
+            attempts += 1;
+            if (attempts < maxAttempts) {
+              setTimeout(attemptLoad, 150);
+              return;
+            }
+            // Fallback: fetch image to warm cache before marking complete
+            fetch(url)
+              .then((res) => {
+                if (!res.ok) throw new Error('fetch failed');
+                return res.blob();
+              })
+              .catch(() => null)
+              .finally(finalize);
+          };
+          img.src = url;
+        };
+
+        attemptLoad();
+      });
+
+    // Load priority images first, then remaining
+    const loadSequence = async () => {
+      // Priority batch (first 3 immediately)
+      const priorityBatch = priorityImages.slice(0, 3).map(item => loadImage(item.url));
+      await Promise.all(priorityBatch);
+
+      // Remaining priority images
+      const nextPriority = priorityImages.slice(3).map(item => loadImage(item.url));
+      await Promise.all(nextPriority);
+
+      // Load remaining images with worker pool
+      let index = 0;
+      const workers = Array.from({ length: Math.min(concurrency, remainingImages.length) }, async () => {
+        while (true) {
+          const currentIndex = index;
+          index += 1;
+          if (currentIndex >= remainingImages.length || cancelled) {
+            return;
+          }
+          const item = remainingImages[currentIndex];
+          await loadImage(item.url);
+        }
+      });
+
+      await Promise.all(workers);
+    };
+
+    loadSequence()
+      .then(() => {
+        if (!cancelled) {
+          console.log('[CategoryPage] ✅ Préchargement des images terminé');
+        }
+      })
+      .catch((err) => {
+        console.error('[CategoryPage] Erreur préchargement images:', err);
+        if (!cancelled) {
+          setIsImagePreloading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [songs]);
+
+  useEffect(() => {
+    if (!isImagePreloading) {
+      if (renderFailsafeRef.current) {
+        clearTimeout(renderFailsafeRef.current);
+        renderFailsafeRef.current = null;
+      }
+      return;
+    }
+
+    if (!imageRenderProgress.total) {
+      return;
+    }
+
+    if (imageRenderProgress.loaded >= imageRenderProgress.total) {
+      return;
+    }
+
+    const networkAhead = imageProgress.loaded >= Math.min(imageProgress.total || 0, imageRenderProgress.total);
+    if (!networkAhead) {
+      return;
+    }
+
+    if (renderFailsafeRef.current) {
+      return;
+    }
+
+    renderFailsafeRef.current = setTimeout(() => {
+      renderFailsafeRef.current = null;
+      console.warn('[CategoryPage][Render] Failsafe déclenché - confirmation forcée', {
+        networkLoaded: imageProgress.loaded,
+        renderProgress: imageRenderProgress
+      });
+      loaderStartRef.current = null;
+      setImageRenderProgress((prev) => ({ ...prev, loaded: prev.total }));
+      setIsImagePreloading(false);
+    }, IMAGE_RENDER_FAILSAFE_MS);
+
+    return undefined;
+  }, [isImagePreloading, imageProgress, imageRenderProgress]);
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
   function adjustColorLightness(color: string, percent: number): string {
@@ -698,6 +913,10 @@ export default function EventCategoryPageClient({
 
   // Fonction pour naviguer avec transition
   const handleSongSelect = (songKey: string) => {
+    if (isLoading) {
+      return;
+    }
+
     // Activer la transition
     setIsNavigating(true);
     
@@ -832,65 +1051,69 @@ export default function EventCategoryPageClient({
               </motion.div>
               
               {/* Equalizer bars in background */}
-              <div className="absolute -z-10 inset-0 flex items-center justify-center space-x-1">
-                {[...Array(12)].map((_, i) => (
+              {animationsReady && (
+                <div className="absolute -z-10 inset-0 flex items-center justify-center space-x-1">
+                  {[...Array(12)].map((_, i) => (
+                    <motion.div 
+                      key={i} 
+                      className="w-1 rounded-full"
+                      style={{ 
+                        backgroundColor: i % 2 === 0 
+                          ? 'var(--primary-color)' 
+                          : 'var(--secondary-color)',
+                        opacity: 0.4,
+                        height: '100%'
+                      }}
+                      animate={{
+                        height: [
+                          `${20 + Math.random() * 40}%`, 
+                          `${60 + Math.random() * 40}%`, 
+                          `${10 + Math.random() * 30}%`
+                        ]
+                      }}
+                      transition={{
+                        duration: 1.2 + Math.random(),
+                        ease: "easeInOut",
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        delay: i * 0.08
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Audio waveform visualization */}
+            {animationsReady && (
+              <div className="flex items-end justify-center space-x-1 mb-8 h-12">
+                {[...Array(24)].map((_, i) => (
                   <motion.div 
                     key={i} 
-                    className="w-1 rounded-full"
+                    className="w-1.5 rounded-full"
                     style={{ 
-                      backgroundColor: i % 2 === 0 
-                        ? 'var(--primary-color)' 
-                        : 'var(--secondary-color)',
-                      opacity: 0.4,
-                      height: '100%'
+                      background: `linear-gradient(to top, var(--${i % 2 ? 'primary' : 'secondary'}-color}), transparent)`,
+                      opacity: 0.8
                     }}
                     animate={{
                       height: [
-                        `${20 + Math.random() * 40}%`, 
+                        `${10 + Math.random() * 40}%`, 
                         `${60 + Math.random() * 40}%`, 
-                        `${10 + Math.random() * 30}%`
+                        `${10 + Math.random() * 30}%`, 
+                        `${50 + Math.random() * 50}%`
                       ]
                     }}
                     transition={{
-                      duration: 1.2 + Math.random(),
+                      duration: 1.2,
                       ease: "easeInOut",
                       repeat: Infinity,
-                      repeatType: "reverse",
-                      delay: i * 0.08
+                      repeatType: "mirror",
+                      delay: i * 0.05
                     }}
                   />
                 ))}
               </div>
-            </div>
-            
-            {/* Audio waveform visualization */}
-            <div className="flex items-end justify-center space-x-1 mb-8 h-12">
-              {[...Array(24)].map((_, i) => (
-                <motion.div 
-                  key={i} 
-                  className="w-1.5 rounded-full"
-                  style={{ 
-                    background: `linear-gradient(to top, var(--${i % 2 ? 'primary' : 'secondary'}-color}), transparent)`,
-                    opacity: 0.8
-                  }}
-                  animate={{
-                    height: [
-                      `${10 + Math.random() * 40}%`, 
-                      `${60 + Math.random() * 40}%`, 
-                      `${10 + Math.random() * 30}%`, 
-                      `${50 + Math.random() * 50}%`
-                    ]
-                  }}
-                  transition={{
-                    duration: 1.2,
-                    ease: "easeInOut",
-                    repeat: Infinity,
-                    repeatType: "mirror",
-                    delay: i * 0.05
-                  }}
-                />
-              ))}
-            </div>
+            )}
             
             <motion.h3 
               className="text-white text-2xl font-bold text-center mb-3"
@@ -914,39 +1137,62 @@ export default function EventCategoryPageClient({
             >
               Préparation de la bibliothèque musicale
             </motion.p>
+
+            {totalImagesToLoad > 0 && (
+              <motion.div
+                className="w-full mt-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.35 }}
+              >
+                <p className="text-white text-center text-sm mb-2">
+                  Chargement des visuels {displayedImageLoaded}/{totalImagesToLoad}
+                </p>
+                <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-white/90 to-white/40 transition-all duration-500"
+                    style={{
+                      width: `${loaderPercent}%`
+                    }}
+                  />
+                </div>
+              </motion.div>
+            )}
             
             {/* Music notes floating animation */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute"
-                  style={{ 
-                    color: i % 2 === 0 ? 'var(--primary-color)' : 'var(--secondary-color)',
-                    opacity: 0.15,
-                    fontSize: `${1 + Math.random() * 1.5}rem`
-                  }}
-                  initial={{ 
-                    x: `${Math.random() * 100}%`, 
-                    y: "120%",
-                    rotate: Math.random() * 360
-                  }}
-                  animate={{ 
-                    y: "-20%",
-                    rotate: Math.random() > 0.5 ? 360 : -360
-                  }}
-                  transition={{
-                    duration: 3 + Math.random() * 7,
-                    repeat: Infinity,
-                    repeatType: "loop",
-                    ease: "linear",
-                    delay: Math.random() * 5
-                  }}
-                >
-                  {['♪', '♫', '♩', '♬', '🎵', '🎶'][Math.floor(Math.random() * 6)]}
-                </motion.div>
-              ))}
-            </div>
+            {animationsReady && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute"
+                    style={{ 
+                      color: i % 2 === 0 ? 'var(--primary-color)' : 'var(--secondary-color)',
+                      opacity: 0.15,
+                      fontSize: `${1 + Math.random() * 1.5}rem`
+                    }}
+                    initial={{ 
+                      x: `${Math.random() * 100}%`, 
+                      y: "120%",
+                      rotate: Math.random() * 360
+                    }}
+                    animate={{ 
+                      y: "-20%",
+                      rotate: Math.random() > 0.5 ? 360 : -360
+                    }}
+                    transition={{
+                      duration: 3 + Math.random() * 7,
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      ease: "linear",
+                      delay: Math.random() * 5
+                    }}
+                  >
+                    {['♪', '♫', '♩', '♬', '🎵', '🎶'][Math.floor(Math.random() * 6)]}
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -984,7 +1230,7 @@ export default function EventCategoryPageClient({
             </motion.h1>
             
             {/* Back button */}
-            <div className="mb-6 text-center">
+            <div className="mb-8 text-center">
               <button
                 onClick={() => {
                   if (!navigator.onLine) {
@@ -993,19 +1239,19 @@ export default function EventCategoryPageClient({
                     router.push(`/event/${id}`);
                   }
                 }}
-                className="py-3 px-6 rounded-lg transition-all flex items-center gap-2 mx-auto text-white hover:translate-y-[-2px] hover:shadow-xl"
+                className="py-4 px-10 rounded-2xl transition-all flex items-center gap-3 mx-auto text-white text-xl font-semibold uppercase tracking-wide hover:translate-y-[-3px] hover:shadow-[0_20px_35px_rgba(0,0,0,0.35)]"
                 style={{ 
                   backgroundColor: 'var(--primary-color-75)',
                   border: 'none',
                   borderLeft: '4px solid var(--primary-color)',
                   borderRight: '4px solid var(--secondary-color)',
-                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
+                  boxShadow: '0 14px 30px rgba(0, 0, 0, 0.35)'
                 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
-                <span className="font-medium">Retour aux catégories</span>
+                <span className="font-bold">Retour aux catégories</span>
               </button>
             </div>
           </div>
@@ -1080,7 +1326,8 @@ export default function EventCategoryPageClient({
                             <img
                               src={song.imageUrl}
                               alt={song.title}
-                              loading="lazy"
+                              loading="eager"
+                              fetchPriority="high"
                               decoding="async"
                               className="absolute inset-0 w-full h-full object-cover"
                               onLoad={(e) => {
@@ -1088,19 +1335,21 @@ export default function EventCategoryPageClient({
                                 const parent = (e.target as HTMLImageElement).parentElement;
                                 const placeholder = parent?.querySelector('.animate-pulse');
                                 if (placeholder) placeholder.classList.remove('animate-pulse');
+                                handleSlideImageRendered(song.imageUrl);
                               }}
+                              onError={() => handleSlideImageRendered(song.imageUrl)}
                             />
                           )}
                           {/* Primary Color Overlay with Opacity */}
                           <div 
                             className="absolute inset-0"
                             style={{
-                              backgroundColor: 'var(--primary-color-75)',
-                              mixBlendMode: 'multiply'
+                              backgroundColor: 'rgba(0, 0, 0, 0.15)',
+                              mixBlendMode: 'normal'
                             }} 
                           />
                           {/* Gradient Overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/25 to-transparent" />
                         </div>
 
                         {/* Glassmorphism Layer */}
@@ -1138,11 +1387,12 @@ export default function EventCategoryPageClient({
 
                           {/* Song Info with Glassmorphism */}
                           <div 
-                            className="rounded-2xl p-5 border border-white/50 shadow-2xl transform group-hover:translate-y-[-10px] transition-transform duration-300"
+                            className="rounded-2xl p-5 border shadow-xl transform group-hover:translate-y-[-10px] transition-transform duration-300"
                             style={{
-                              backdropFilter: 'blur(20px)',
-                              WebkitBackdropFilter: 'blur(20px)',
-                              background: 'rgba(255, 255, 255, 0.15)'
+                              borderColor: 'rgba(255, 255, 255, 0.08)',
+                              background: 'linear-gradient(135deg, rgba(12, 17, 32, 0.08), rgba(12, 17, 32, 0.02))',
+                              backdropFilter: 'blur(6px)',
+                              WebkitBackdropFilter: 'blur(6px)'
                             }}
                           >
                             {/* Title */}
