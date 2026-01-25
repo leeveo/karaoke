@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { Event as EventType } from '@/types/event';
 import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
 import { pendingEmailStore } from '@/lib/offline/pendingEmailStore';
+import { uploadQueue } from '@/lib/upload-queue';
 
 export default function EventQRPage() {
   const searchParams = useSearchParams();
@@ -16,11 +17,32 @@ export default function EventQRPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<EventType | null>(null);
   
-  // Détection du mode offline via variable d'environnement OU localStorage (pour tests)
-  const isOfflinePackage = process.env.NEXT_PUBLIC_OFFLINE_MODE === 'true' || 
-                           (typeof window !== 'undefined' && localStorage.getItem('forceOfflineMode') === 'true');
+  // Détection du mode offline package (Electron via window.offlineKiosk ou localStorage)
+  const [isOfflinePackage, setIsOfflinePackage] = useState(false);
   
-  const [isOnline, setIsOnline] = useState(!isOfflinePackage);
+  // Détecter le mode offline au montage (côté client uniquement)
+  useEffect(() => {
+    // Méthode 1: window.offlineKiosk exposé par le preload.js d'Electron
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).offlineKiosk?.ready) {
+      console.log('[Offline Detection] 🔴 Electron détecté via window.offlineKiosk');
+      setIsOfflinePackage(true);
+      return;
+    }
+    
+    // Méthode 2: localStorage (pour tests manuels)
+    if (localStorage.getItem('forceOfflineMode') === 'true') {
+      console.log('[Offline Detection] 🔴 Mode forcé via localStorage');
+      setIsOfflinePackage(true);
+      return;
+    }
+    
+    console.log('[Offline Detection] Mode online normal');
+    setIsOfflinePackage(false);
+  }, []);
+  
+  // État de connexion: sera mis à jour par useEffect quand isOfflinePackage est détecté
+  const [isOnline, setIsOnline] = useState(true); // Défaut optimiste, sera corrigé côté client
   const router = useRouter();
   
   // Log pour debugging
@@ -33,30 +55,68 @@ export default function EventQRPage() {
     }
   }, [isOfflinePackage]);
   
-  // Surveillance de la connectivité réseau (en plus du mode offline package)
+  // 🚀 Surveiller l'upload en arrière-plan et mettre à jour l'URL quand c'est terminé
+  const [uploadStatus, setUploadStatus] = useState<string>('pending');
+  
   useEffect(() => {
-    // Si on est en mode offline package, ne pas chercher à détecter en ligne
-    if (isOfflinePackage) {
-      console.log('[Online Check] Mode offline package détecté, utiliser navigator.onLine pour statut');
-      setIsOnline(navigator.onLine);
+    if (typeof sessionId !== 'string') return;
+    
+    // Vérifier si un upload est en cours pour cette session
+    const checkUploadStatus = () => {
+      const status = uploadQueue.getStatusBySession(sessionId);
+      if (status) {
+        console.log('[QR Page] Upload status:', status.status, status.progress + '%');
+        setUploadStatus(status.status);
+        
+        if (status.status === 'completed' && status.s3Url) {
+          console.log('[QR Page] ✅ Upload terminé! Mise à jour URL:', status.s3Url);
+          setPageUrl(status.s3Url);
+          sessionStorage.setItem('video-s3-url', status.s3Url);
+        }
+      }
+    };
+    
+    // Vérifier immédiatement
+    checkUploadStatus();
+    
+    // S'abonner aux mises à jour
+    const unsubscribe = uploadQueue.subscribe(sessionId, (item) => {
+      console.log('[QR Page] Upload update:', item.status, item.progress + '%');
+      setUploadStatus(item.status);
       
-      const handleOnline = () => {
-        console.log('[Online Check] Event online détecté');
-        setIsOnline(true);
-      };
-      const handleOffline = () => {
-        console.log('[Online Check] Event offline détecté');
-        setIsOnline(false);
-      };
+      if (item.status === 'completed' && item.s3Url) {
+        console.log('[QR Page] ✅ Upload terminé! URL:', item.s3Url);
+        setPageUrl(item.s3Url);
+        sessionStorage.setItem('video-s3-url', item.s3Url);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [sessionId]);
+  
+  // Surveillance de la connectivité réseau
+  // On utilise navigator.onLine même en mode Electron pour permettre le basculement dynamique
+  useEffect(() => {
+    // Utiliser navigator.onLine pour tous les modes (y compris Electron)
+    console.log('[Online Check] navigator.onLine:', navigator.onLine, '| isOfflinePackage:', isOfflinePackage);
+    setIsOnline(navigator.onLine);
+    
+    const handleOnline = () => {
+      console.log('[Online Check] Event online détecté');
+      setIsOnline(true);
+    };
+    const handleOffline = () => {
+      console.log('[Online Check] Event offline détecté');
+      setIsOnline(false);
+    };
 
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [isOfflinePackage]);
 
   // Charger l'événement et ses personnalisations
@@ -215,9 +275,10 @@ export default function EventQRPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
-  const [countdown, setCountdown] = useState(45);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [offlineEmailSaved, setOfflineEmailSaved] = useState(false);
+  const [showSendingToast, setShowSendingToast] = useState(false);
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false);
   const [currentInputField, setCurrentInputField] = useState<'name' | 'email'>('email');
 
@@ -290,32 +351,8 @@ export default function EventQRPage() {
     }
   }, [pageUrl, router, id, event]);
 
-  // Timer de redirection automatique après 15 secondes
-  useEffect(() => {
-    if (!pageUrl) return;
-
-    // Démarrer le compte à rebours
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Redirection après 15 secondes
-    const redirectTimer = setTimeout(() => {
-      router.push(`/event/${id}`);
-    }, 45000);
-
-    // Nettoyer les timers
-    return () => {
-      clearInterval(countdownInterval);
-      clearTimeout(redirectTimer);
-    };
-  }, [pageUrl, router, id]);
+  // Timer de redirection automatique désactivé pour laisser le temps de remplir l'email
+  // L'utilisateur doit cliquer sur "Terminer" pour revenir à l'accueil
 
   // Gérer le changement des champs du formulaire
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -492,14 +529,12 @@ export default function EventQRPage() {
         await pendingEmailStore.savePendingEmail(pendingEmail);
         console.log('✓ Email saved offline:', pendingEmail.id);
 
+        // Marquer comme sauvegardé pour cacher le formulaire
+        setOfflineEmailSaved(true);
+        
         // Afficher le pop-up de succès
         setSuccessMessage('Vidéo sauvegardée! Elle sera envoyée par email dès que vous serez de retour en ligne.');
         setShowSuccessPopup(true);
-
-        // Fermer automatiquement le pop-up après 3 secondes
-        setTimeout(() => {
-          setShowSuccessPopup(false);
-        }, 3000);
 
         // Fermer le formulaire
         setShowForm(false);
@@ -512,6 +547,11 @@ export default function EventQRPage() {
         return;
       }
     }
+    
+    // MODE ONLINE: Fermer le formulaire immédiatement et traiter en arrière-plan
+    setShowForm(false);
+    setIsSubmitting(false);
+    setShowSendingToast(true); // Afficher le toast "Envoi en cours..."
     
     let videoUrlForEmail = pageUrl; // Default to original URL
     
@@ -563,35 +603,43 @@ export default function EventQRPage() {
       console.log('✓ Sending email with videoUrlForEmail:', videoUrlForEmail);
       const emailResult = await sendEmail(videoUrlForEmail);
       
+      // Masquer le toast d'envoi
+      setShowSendingToast(false);
+      
       // Marquer comme envoyé
       setEmailSent(true);
       
       // Copier le lien dans le presse-papiers (seulement si pas blob)
-      if (videoUrlForEmail && !videoUrlForEmail.startsWith('blob:')) {
-        await navigator.clipboard.writeText(videoUrlForEmail as string);
+      // Note: peut échouer en mode Electron kiosk (permission refusée)
+      try {
+        if (videoUrlForEmail && !videoUrlForEmail.startsWith('blob:')) {
+          await navigator.clipboard.writeText(videoUrlForEmail as string);
+          console.log('✓ Lien copié dans le presse-papiers');
+        }
+      } catch (clipboardErr) {
+        console.warn('⚠ Impossible de copier dans le presse-papiers:', clipboardErr);
+        // On continue quand même, ce n'est pas critique
       }
       
       // Afficher le pop-up de succès avec message adapté
       if (emailResult?.offline) {
         setSuccessMessage('📧 Email sauvegardé! Il sera envoyé automatiquement lors de la prochaine connexion internet.');
       } else {
-        setSuccessMessage('Email envoyé avec succès et lien copié!');
+        setSuccessMessage('✅ Email envoyé avec succès!');
       }
       setShowSuccessPopup(true);
       
-      // Fermer automatiquement le pop-up après 5 secondes (plus long pour lire le message offline)
+      // Fermer automatiquement le pop-up après 4 secondes
       setTimeout(() => {
         setShowSuccessPopup(false);
-      }, emailResult?.offline ? 5000 : 3000);
-      
-      // Fermer le formulaire
-      setShowForm(false);
+      }, 4000);
       
     } catch (error) {
       console.error('✗ Error during form submission:', error);
-      setFormError('Erreur lors de l&apos;envoi de l&apos;email, veuillez réessayer');
-    } finally {
-      setIsSubmitting(false);
+      setShowSendingToast(false);
+      setSuccessMessage('❌ Erreur lors de l\'envoi. Veuillez réessayer.');
+      setShowSuccessPopup(true);
+      setTimeout(() => setShowSuccessPopup(false), 4000);
     }
   };
 
@@ -615,6 +663,42 @@ export default function EventQRPage() {
           <p className="text-white text-xl">Récupération de votre vidéo...</p>
           <p className="text-white/60 mt-2">Veuillez patienter </p>
          
+        </div>
+      </div>
+    );
+  }
+
+  // Mode offline avec email déjà sauvegardé: afficher seulement le popup de succès
+  if (!isOnline && pageUrl?.startsWith('blob:') && offlineEmailSaved) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
+          style={{
+            backgroundImage: event?.customization?.backgroundImageUrl 
+              ? `url('${event.customization.backgroundImageUrl}')` 
+              : "url('/bg.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundAttachment: "fixed"
+          }}>
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
+        
+        {/* Pop-up de succès */}
+        <div className="z-50 bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-auto">
+          <div className="text-center">
+            <div className="text-6xl mb-6">✅</div>
+            <h3 className="text-3xl font-bold text-green-600 mb-4">Succès!</h3>
+            <p className="text-gray-700 text-lg mb-6">{successMessage || 'Vidéo sauvegardée! Elle sera envoyée par email dès que vous serez de retour en ligne.'}</p>
+            <button
+              onClick={() => {
+                router.push(`/event/${id}`);
+              }}
+              className="px-8 py-4 rounded-lg text-white font-bold text-xl"
+              style={{ background: 'var(--primary-gradient)' }}
+            >
+              Retour à l&apos;événement
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -684,6 +768,7 @@ export default function EventQRPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    onFocus={() => handleInputFocus('name')}
                     autoFocus
                     inputMode="text"
                     className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
@@ -704,6 +789,7 @@ export default function EventQRPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    onFocus={() => handleInputFocus('email')}
                     inputMode="email"
                     className="w-full px-4 py-3 border-2 rounded-md shadow-sm focus:outline-none focus:ring-4 text-lg font-semibold transition-all"
                     style={{ 
@@ -807,9 +893,56 @@ export default function EventQRPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Clavier virtuel pour mode offline */}
+              {showVirtualKeyboard && (
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold" style={{ color: 'var(--primary-color)' }}>
+                      Clavier virtuel - {currentInputField === 'name' ? 'Votre nom' : 'Votre email'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={closeVirtualKeyboard}
+                      className="text-gray-500 hover:text-gray-700 text-xl"
+                    >
+                      ✖️
+                    </button>
+                  </div>
+                  <VirtualKeyboard
+                    onChange={handleVirtualKeyboardChange}
+                    value={formData[currentInputField]}
+                    placeholder={currentInputField === 'name' ? 'Entrez votre nom' : 'votre@email.com'}
+                    theme="hg-theme-default"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
+        
+        {/* Pop-up de succès pour mode offline */}
+        {showSuccessPopup && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-auto animate-bounce">
+              <div className="text-center">
+                <div className="text-5xl mb-4">✅</div>
+                <h3 className="text-2xl font-bold text-green-600 mb-2">Succès!</h3>
+                <p className="text-gray-700">{successMessage}</p>
+                <button
+                  onClick={() => {
+                    setShowSuccessPopup(false);
+                    router.push(`/event/${id}`);
+                  }}
+                  className="mt-6 px-6 py-3 rounded-lg text-white font-bold"
+                  style={{ background: 'var(--primary-gradient)' }}
+                >
+                  Retour à l&apos;événement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -877,30 +1010,83 @@ export default function EventQRPage() {
              Votre vidéo est prête !
           </h1>
           
-          <p className="mb-6 text-center text-white drop-shadow-md">
-            Scannez ce QR code pour accéder à votre performance
-          </p>
           
-          <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-inner mb-6"
-            style={{
-              border: '1px solid rgba(255, 255, 255, 0.5)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)'
-            }}
-          >
-            <QRCodeDisplay url={pageUrl} size={250} />
-          </div>
+          {/* QR Code - affiché UNIQUEMENT quand l'URL S3 est disponible */}
+          {isOnline ? (
+            uploadStatus === 'completed' ? (
+              <>
+                <p className="mb-6 text-center text-white drop-shadow-md">
+                  Scannez ce QR code pour accéder à votre performance
+                </p>
+                
+                <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-inner mb-6"
+                  style={{
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)'
+                  }}
+                >
+                  <QRCodeDisplay url={pageUrl} size={250} />
+                </div>
+              </>
+            ) : uploadStatus === 'failed' ? (
+              <div className="bg-red-100/90 backdrop-blur-sm p-6 rounded-lg shadow-inner mb-6 text-center"
+                style={{
+                  border: '2px solid rgba(239, 68, 68, 0.5)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)'
+                }}
+              >
+                <div className="text-4xl mb-3">⚠️</div>
+                <p className="text-red-800 font-semibold text-lg">
+                  Erreur lors de la sauvegarde
+                </p>
+                <p className="text-red-700 text-sm mt-2">
+                  Utilisez le formulaire email ci-dessous pour recevoir votre vidéo
+                </p>
+              </div>
+            ) : (
+              <div className="bg-blue-100/90 backdrop-blur-sm p-6 rounded-lg shadow-inner mb-6 text-center"
+                style={{
+                  border: '2px solid rgba(59, 130, 246, 0.5)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)'
+                }}
+              >
+                <div className="flex justify-center mb-4">
+                  <svg className="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <p className="text-blue-800 font-semibold text-lg">
+                  Création du QR code en cours...
+                </p>
+                <p className="text-blue-700 text-sm mt-2">
+                  Votre vidéo est en cours de sauvegarde.<br/>
+                  Le QR code apparaîtra dans quelques instants.
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="bg-yellow-100/90 backdrop-blur-sm p-6 rounded-lg shadow-inner mb-6 text-center"
+              style={{
+                border: '2px solid rgba(251, 191, 36, 0.5)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)'
+              }}
+            >
+              <div className="text-4xl mb-3">📡</div>
+              <p className="text-yellow-800 font-semibold text-lg">
+                QR Code non disponible en mode Hors-Ligne
+              </p>
+              <p className="text-yellow-700 text-sm mt-2">
+                Utilisez le bouton ci-dessous pour recevoir votre vidéo par email
+              </p>
+            </div>
+          )}
           
-          {/* Affichage du compte à rebours */}
-          <div className="mb-4 text-center">
-            <p className="text-white drop-shadow-md text-sm">
-              Redirection automatique dans{' '}
-              <span className="font-bold text-lg" style={{ color: 'var(--secondary-color)' }}>
-                {countdown}
-              </span>
-              {' '}seconde{countdown !== 1 ? 's' : ''}
-            </p>
-          </div>
+          {/* Countdown désactivé - l'utilisateur a tout le temps pour remplir l'email */}
           
           {loadError && (
             <div className="p-3 rounded-md text-sm text-center"
@@ -1131,6 +1317,16 @@ export default function EventQRPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Toast "Envoi en cours..." */}
+      {showSendingToast && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-blue-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-pulse">
+            <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span className="font-medium text-lg">📧 Envoi de l&apos;email en cours...</span>
           </div>
         </div>
       )}

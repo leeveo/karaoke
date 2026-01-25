@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { startServer } = require('../server');
@@ -72,6 +72,24 @@ async function bootServer() {
 function createWindow() {
   const manifest = loadManifest();
   const eventPath = manifest?.event?.id ? `/event/${manifest.event.id}` : '/';
+
+  // Grant camera and microphone permissions automatically
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'mediaKeySystem', 'geolocation', 'notifications'];
+    if (allowedPermissions.includes(permission)) {
+      console.log('[OfflineShell] Granting permission:', permission);
+      callback(true);
+    } else {
+      console.log('[OfflineShell] Denying permission:', permission);
+      callback(false);
+    }
+  });
+
+  // Also handle permission check (for getUserMedia)
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    const allowedPermissions = ['media', 'mediaKeySystem'];
+    return allowedPermissions.includes(permission);
+  });
 
   const mainWindow = new BrowserWindow({
     width: 1280,

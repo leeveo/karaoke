@@ -39,9 +39,61 @@ type OfflineManifestEvent = {
   assets?: OfflineManifestAssets;
 };
 
+type OfflineManifestSong = {
+  key: string;
+  title: string;
+  artist: string;
+  size?: number;
+  videoPath?: string;
+  imagePath?: string;
+};
+
+type OfflineManifestCategory = {
+  id: string;
+  label: string;
+  songs: OfflineManifestSong[];
+};
+
 type OfflineManifestResponse = {
   event?: OfflineManifestEvent;
+  categories?: OfflineManifestCategory[];
 };
+
+/**
+ * Cache en mémoire pour le manifest offline
+ * Évite de recharger le manifest à chaque navigation
+ */
+let manifestCache: OfflineManifestResponse | null = null;
+let manifestCacheTimestamp = 0;
+const MANIFEST_CACHE_TTL = 60 * 60 * 1000; // 1 heure
+
+async function getOfflineManifestCached(): Promise<OfflineManifestResponse | null> {
+  const now = Date.now();
+  
+  // Retourner le cache s'il est encore valide
+  if (manifestCache && (now - manifestCacheTimestamp) < MANIFEST_CACHE_TTL) {
+    console.log('[Manifest Cache] ✅ Manifest chargé depuis le cache mémoire');
+    return manifestCache;
+  }
+  
+  try {
+    console.log('[Manifest Cache] 📥 Chargement du manifest depuis /api/offline/manifest...');
+    const response = await fetch('/api/offline/manifest');
+    console.log('[Manifest Cache] Response status:', response.status);
+    if (!response.ok) {
+      console.warn('[Manifest Cache] ❌ Manifest non disponible (status:', response.status, ')');
+      return null;
+    }
+    
+    manifestCache = await response.json();
+    manifestCacheTimestamp = now;
+    console.log('[Manifest Cache] 💾 Manifest mis en cache avec', manifestCache?.categories?.length || 0, 'catégories');
+    return manifestCache;
+  } catch (error) {
+    console.warn('[Manifest Cache] ❌ Erreur lors du chargement:', error);
+    return null;
+  }
+}
 
 function normalizeOfflineAssetPath(rawPath?: string | null) {
   if (!rawPath) {
@@ -90,12 +142,7 @@ function buildEventFromManifest(manifestEvent: OfflineManifestEvent, fallbackId:
 
 async function loadOfflineManifestEvent(eventId: string): Promise<Event | null> {
   try {
-    const response = await fetch('/api/offline/manifest', { cache: 'no-store' });
-    if (!response.ok) {
-      return null;
-    }
-
-    const manifest: OfflineManifestResponse = await response.json();
+    const manifest = await getOfflineManifestCached();
     if (!manifest?.event) {
       return null;
     }
@@ -103,6 +150,74 @@ async function loadOfflineManifestEvent(eventId: string): Promise<Event | null> 
     return buildEventFromManifest(manifest.event, eventId);
   } catch (error) {
     console.warn('[CategoryPage] Unable to load offline manifest:', error);
+    return null;
+  }
+}
+
+/**
+ * Charge les chansons depuis le manifest offline pour le mode kiosk Electron
+ */
+async function loadSongsFromOfflineManifest(categoryId: string): Promise<Song[] | null> {
+  try {
+    console.log('[CategoryPage] 🔌 Loading songs from offline manifest for category:', categoryId);
+    const manifest = await getOfflineManifestCached();
+    if (!manifest) {
+      console.warn('[CategoryPage] Offline manifest not available');
+      return null;
+    }
+
+    if (!manifest?.categories || !Array.isArray(manifest.categories)) {
+      console.warn('[CategoryPage] No categories in manifest');
+      return null;
+    }
+
+    // Cas spécial: "all" retourne toutes les chansons de toutes les catégories
+    if (categoryId.toLowerCase() === 'all') {
+      const allSongs: Song[] = [];
+      for (const cat of manifest.categories) {
+        if (cat.songs && cat.songs.length > 0) {
+          for (const s of cat.songs) {
+            allSongs.push({
+              key: s.key,
+              title: s.title || s.key,
+              artist: s.artist || 'Unknown',
+              size: s.size || 0,
+              imageUrl: s.imagePath ? `/_offline/${s.imagePath.replace(/^\.?\/?/, '')}` : undefined,
+            });
+          }
+        }
+      }
+      if (allSongs.length > 0) {
+        console.log(`[CategoryPage] ✅ ${allSongs.length} chansons (all) chargées depuis manifest offline`);
+        return allSongs;
+      }
+      console.warn('[CategoryPage] No songs found in manifest for "all"');
+      return null;
+    }
+
+    // Chercher la catégorie (case insensitive)
+    const category = manifest.categories.find(
+      (c) => c.id.toLowerCase() === categoryId.toLowerCase() || c.label.toLowerCase() === categoryId.toLowerCase()
+    );
+
+    if (!category || !category.songs || category.songs.length === 0) {
+      console.warn(`[CategoryPage] Category ${categoryId} not found in manifest or empty`);
+      return null;
+    }
+
+    // Convertir les chansons du manifest en format Song (sans videoUrl, géré par la page karaoke)
+    const songs: Song[] = category.songs.map((s) => ({
+      key: s.key,
+      title: s.title || s.key,
+      artist: s.artist || 'Unknown',
+      size: s.size || 0,
+      imageUrl: s.imagePath ? `/_offline/${s.imagePath.replace(/^\.?\/?/, '')}` : undefined,
+    }));
+
+    console.log(`[CategoryPage] ✅ ${songs.length} chansons chargées depuis manifest offline`);
+    return songs;
+  } catch (error) {
+    console.error('[CategoryPage] Error loading songs from offline manifest:', error);
     return null;
   }
 }
@@ -116,6 +231,65 @@ const mapCategoryToS3Folder = (category: string): string => {
   };
   return categoryMapping[lowerCategory] || lowerCategory;
 };
+
+/**
+ * Cache en mémoire pour les chansons (mode online)
+ * Évite de recharger les chansons à chaque navigation
+ */
+const SONGS_CACHE_KEY = 'karaoke_songs_cache';
+const SONGS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+interface SongsCacheEntry {
+  songs: Song[];
+  timestamp: number;
+}
+
+function getSongsFromCache(category: string): Song[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cacheData = sessionStorage.getItem(`${SONGS_CACHE_KEY}_${category}`);
+    if (!cacheData) return null;
+    
+    const entry: SongsCacheEntry = JSON.parse(cacheData);
+    const now = Date.now();
+    
+    // Vérifier si le cache est encore valide
+    if (now - entry.timestamp < SONGS_CACHE_TTL) {
+      console.log(`[Cache] ✅ Chansons "${category}" trouvées en cache (${entry.songs.length} chansons)`);
+      return entry.songs;
+    }
+    
+    // Cache expiré
+    console.log(`[Cache] ⏰ Cache expiré pour "${category}"`);
+    sessionStorage.removeItem(`${SONGS_CACHE_KEY}_${category}`);
+    return null;
+  } catch (e) {
+    console.warn('[Cache] Erreur lecture cache:', e);
+    return null;
+  }
+}
+
+function saveSongsToCache(category: string, songs: Song[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const entry: SongsCacheEntry = {
+      songs,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem(`${SONGS_CACHE_KEY}_${category}`, JSON.stringify(entry));
+    console.log(`[Cache] 💾 ${songs.length} chansons sauvegardées en cache pour "${category}"`);
+  } catch (e) {
+    console.warn('[Cache] Erreur sauvegarde cache:', e);
+  }
+}
+
+/**
+ * Détection du mode kiosk Electron (offline package)
+ */
+function isKioskMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!(window as unknown as { offlineKiosk?: { ready?: boolean } }).offlineKiosk?.ready;
+}
 
 export default function EventCategoryPageClient({
   params,
@@ -324,6 +498,51 @@ export default function EventCategoryPageClient({
           const s3FolderCategory = mapCategoryToS3Folder(category);
           console.log(`[CategoryPage] Mapped to S3 folder: ${s3FolderCategory}`);
           
+          // 🔌 Mode Kiosk Electron: TOUJOURS charger depuis le manifest offline (même si online)
+          const kioskModeActive = typeof window !== 'undefined' && (window as unknown as { offlineKiosk?: { ready?: boolean } }).offlineKiosk?.ready;
+          if (kioskModeActive) {
+            console.log('[CategoryPage] 🔌 Mode Kiosk détecté - chargement FORCÉ depuis manifest offline');
+            const manifestSongs = await loadSongsFromOfflineManifest(s3FolderCategory);
+            if (manifestSongs && manifestSongs.length > 0) {
+              console.log(`[CategoryPage] ✅ ${manifestSongs.length} chansons chargées depuis manifest`);
+              setSongs(manifestSongs);
+              setError(null);
+              // isLoading sera désactivé après le préchargement des images
+              return;
+            }
+            // En mode kiosk, si le manifest échoue, essayer IndexedDB avant l'API online
+            console.warn('[CategoryPage] Manifest vide ou erreur, fallback sur IndexedDB...');
+            const offlineSongs = await loadOfflineSongsByCategory(s3FolderCategory);
+            if (offlineSongs && offlineSongs.length > 0) {
+              console.log(`[CategoryPage] ${offlineSongs.length} chansons trouvées en IndexedDB`);
+              const formattedSongs = offlineSongs.map(s => ({
+                key: s.key,
+                title: s.title || s.key,
+                artist: s.artist || 'Unknown',
+                size: s.size,
+                imageUrl: s.imageUrl
+              })) as Song[];
+              setSongs(formattedSongs);
+              setError(null);
+              // isLoading sera désactivé après le préchargement des images
+              return;
+            }
+            // Dernier recours en mode kiosk: API locale (ne devrait pas arriver)
+            console.warn('[CategoryPage] IndexedDB vide, tentative API locale...');
+          }
+          
+          // 🚀 MODE ONLINE (navigateur normal): Vérifier le cache en mémoire d'abord
+          if (!kioskModeActive) {
+            const cachedSongs = getSongsFromCache(s3FolderCategory);
+            if (cachedSongs && cachedSongs.length > 0) {
+              console.log(`[CategoryPage] 🚀 ${cachedSongs.length} chansons chargées depuis le cache`);
+              setSongs(cachedSongs);
+              setError(null);
+              // isLoading sera désactivé après le préchargement des images
+              return;
+            }
+          }
+          
           // Always try local API first (works online & offline kiosk)
           try {
             const controller = new AbortController();
@@ -342,9 +561,15 @@ export default function EventCategoryPageClient({
             const songList = await response.json();
             if (Array.isArray(songList) && songList.length > 0) {
               console.log(`[CategoryPage] ${songList.length} chansons chargées via /api/songs`);
+              
+              // 💾 Sauvegarder dans le cache pour les prochains chargements (mode online uniquement)
+              if (!kioskModeActive) {
+                saveSongsToCache(s3FolderCategory, songList);
+              }
+              
               setSongs(songList);
               setError(null);
-              setIsLoading(false);
+              // isLoading sera désactivé après le préchargement des images
               return;
             }
           } catch (onlineErr) {
@@ -367,12 +592,13 @@ export default function EventCategoryPageClient({
             })) as Song[];
             setSongs(formattedSongs);
             setError(null);
+            // isLoading sera désactivé après le préchargement des images
           } else {
             console.warn('[CategoryPage] Pas de chansons trouvées en offline');
             setError('Aucune chanson disponible (Besoin d\'internet pour charger ou télécharger des chansons)');
+            setIsLoading(false);
           }
         }
-        setIsLoading(false);
       } catch (err) {
         console.error('Erreur lors du chargement des chansons:', err);
         
@@ -392,7 +618,7 @@ export default function EventCategoryPageClient({
               })) as Song[];
               setSongs(formattedSongs);
               setError(null);
-              setIsLoading(false);
+              // isLoading sera désactivé après le préchargement des images
               return;
             }
           }
@@ -407,6 +633,33 @@ export default function EventCategoryPageClient({
 
     fetchSongs();
   }, [category, loadOfflineSongsByCategory]);
+
+  // Préchargement uniquement des premières images (visibles) pour un chargement rapide
+  useEffect(() => {
+    if (songs.length > 0 && isLoading) {
+      // Précharger les premières images visibles et attendre leur chargement
+      const imagesToPreload = songs.slice(0, 10); // 10 premières images
+      console.log(`[CategoryPage] ⏳ Préchargement de ${imagesToPreload.length} images avant affichage...`);
+      
+      const preloadPromises = imagesToPreload
+        .filter(song => song.imageUrl)
+        .map(song => {
+          return new Promise<void>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // Résoudre même en cas d'erreur pour ne pas bloquer
+            img.src = song.imageUrl!;
+          });
+        });
+      
+      // Attendre le chargement de toutes les images (max 3 secondes)
+      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+      Promise.race([Promise.all(preloadPromises), timeout]).then(() => {
+        console.log(`[CategoryPage] ✅ Images préchargées, affichage de la page`);
+        setIsLoading(false);
+      });
+    }
+  }, [songs, isLoading]);
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
   function adjustColorLightness(color: string, percent: number): string {
@@ -450,10 +703,11 @@ export default function EventCategoryPageClient({
     
     // Temporiser la navigation pour montrer le loader
     setTimeout(() => {
-      // En hors ligne, utiliser une navigation MPA (page reload) au lieu de RSC navigation
+      // En mode kiosk ou hors ligne, utiliser une navigation MPA (page reload) au lieu de RSC navigation
       // qui essayerait de charger le RSC payload du serveur et échouerait offline
-      if (!navigator.onLine) {
-        console.warn('[CategoryPage] Offline detected - using MPA navigation instead of RSC');
+      const useHardNav = isKioskMode() || !navigator.onLine;
+      if (useHardNav) {
+        console.warn('[CategoryPage] Kiosk/Offline detected - using MPA navigation instead of RSC');
         window.location.href = `/event/${id}/karaoke/${encodeURIComponent(songKey)}`;
       } else {
         // Online: utiliser la navigation RSC optimale
@@ -478,7 +732,8 @@ export default function EventCategoryPageClient({
         <p className="text-white">{error}</p>
         <button 
           onClick={() => {
-            if (!navigator.onLine) {
+            const useHardNav = isKioskMode() || !navigator.onLine;
+            if (useHardNav) {
               window.location.href = `/event/${id}`;
             } else {
               router.push(`/event/${id}`);
@@ -773,6 +1028,8 @@ export default function EventCategoryPageClient({
                 slidesPerView={3}
                 spaceBetween={30}
                 loop={true}
+                loopAdditionalSlides={2}
+                watchSlidesProgress={true}
                 autoplay={{
                   delay: 4000,
                   disableOnInteraction: false,
@@ -789,9 +1046,9 @@ export default function EventCategoryPageClient({
                 modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
                 className="w-full h-full"
                 breakpoints={{
-                  320: { slidesPerView: 1, spaceBetween: 20 },
-                  768: { slidesPerView: 2, spaceBetween: 25 },
-                  1024: { slidesPerView: 3, spaceBetween: 30 },
+                  320: { slidesPerView: 1, spaceBetween: 20, loopAdditionalSlides: 1 },
+                  768: { slidesPerView: 2, spaceBetween: 25, loopAdditionalSlides: 1 },
+                  1024: { slidesPerView: 3, spaceBetween: 30, loopAdditionalSlides: 2 },
                 }}
                 style={{
                   width: '100%',
@@ -812,17 +1069,25 @@ export default function EventCategoryPageClient({
                       <div className="relative w-full rounded-3xl overflow-hidden group shadow-2xl border border-white" style={{ height: '400px' }}>
                         {/* Background Image with Blur */}
                         <div className="absolute inset-0">
-                          {song.imageUrl ? (
+                          {/* Gradient placeholder (always visible as fallback) */}
+                          <div 
+                            className="absolute inset-0 w-full h-full animate-pulse"
+                            style={{
+                              background: `linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)`
+                            }}
+                          />
+                          {song.imageUrl && (
                             <img
                               src={song.imageUrl}
                               alt={song.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div 
-                              className="w-full h-full"
-                              style={{
-                                background: `linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)`
+                              loading="lazy"
+                              decoding="async"
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onLoad={(e) => {
+                                // Remove pulse animation when loaded
+                                const parent = (e.target as HTMLImageElement).parentElement;
+                                const placeholder = parent?.querySelector('.animate-pulse');
+                                if (placeholder) placeholder.classList.remove('animate-pulse');
                               }}
                             />
                           )}

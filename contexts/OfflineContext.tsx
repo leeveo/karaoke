@@ -21,8 +21,32 @@ export interface OfflineContextType {
 
 const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
 
+// Détection du mode offline package (Electron via window.offlineKiosk ou localStorage)
+const isOfflinePackage = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  // Méthode 1: window.offlineKiosk exposé par preload.js d'Electron
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((window as any).offlineKiosk?.ready) return true;
+  
+  // Méthode 2: localStorage pour tests manuels
+  if (localStorage.getItem('forceOfflineMode') === 'true') return true;
+  
+  return false;
+};
+
 export function OfflineProvider({ children, eventId }: { children: ReactNode; eventId?: string }) {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  // En mode offline package: forcer offline, sinon utiliser navigator.onLine
+  const getInitialOnlineStatus = () => {
+    if (typeof navigator === 'undefined') return true;
+    if (isOfflinePackage()) {
+      console.log('[OfflineContext] 🔴 Mode offline package détecté - forçage offline');
+      return false;
+    }
+    return navigator.onLine;
+  };
+  
+  const [isOnline, setIsOnline] = useState(getInitialOnlineStatus);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress>({ total: 0, completed: 0, failed: 0, progress: 0 });
   const [storageInfo, setStorageInfo] = useState<OfflineContextType['storageInfo']>(null);
@@ -30,6 +54,13 @@ export function OfflineProvider({ children, eventId }: { children: ReactNode; ev
 
   // Monitor online/offline status
   useEffect(() => {
+    // En mode offline package, rester TOUJOURS offline
+    if (isOfflinePackage()) {
+      console.log('[OfflineContext] 🔴 Mode offline package - forçage isOnline=false');
+      setIsOnline(false);
+      return; // Ne pas écouter les événements
+    }
+    
     const handleOnline = () => {
       console.log('[OfflineContext] Online');
       setIsOnline(true);

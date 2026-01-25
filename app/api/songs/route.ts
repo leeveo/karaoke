@@ -98,6 +98,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Headers de cache pour améliorer les performances (30 minutes)
+    const cacheHeaders = {
+      'Cache-Control': 'public, max-age=1800, stale-while-revalidate=3600',
+    };
+
     // Action: Récupérer les catégories
     if (action === 'categories') {
       console.log(`[API Songs] Récupération des catégories...`);
@@ -123,11 +128,11 @@ export async function GET(request: NextRequest) {
 
       if (categories.length === 0) {
         console.log(`[API Songs] Aucune catégorie trouvée, utilisation des valeurs par défaut`);
-        return NextResponse.json(['pop', 'rock', 'rap', 'français', 'anglais', 'latino']);
+        return NextResponse.json(['pop', 'rock', 'rap', 'français', 'anglais', 'latino'], { headers: cacheHeaders });
       }
 
       console.log(`[API Songs] ${categories.length} catégories trouvées:`, categories);
-      return NextResponse.json(categories);
+      return NextResponse.json(categories, { headers: cacheHeaders });
     }
 
     // Action: Récupérer les chansons d'une catégorie
@@ -195,7 +200,7 @@ export async function GET(request: NextRequest) {
       }
 
       console.log(`[API Songs] ${songs.length} chansons trouvées pour ${category}`);
-      return NextResponse.json(songs);
+      return NextResponse.json(songs, { headers: cacheHeaders });
     }
 
     // Action: Obtenir une URL signée pour une chanson

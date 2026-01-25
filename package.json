@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "build:offline-package": "node scripts/build-offline-package.js",
-    "kiosk:build": "node scripts/kiosk-build.js"
+    "kiosk:build": "node scripts/kiosk-build.js",
+    "test:quick": "node scripts/quick-test.js",
+    "test:quick:rebuild": "node scripts/quick-test.js --rebuild",
+    "test:quick:copy": "node scripts/quick-test.js --copy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.812.0",

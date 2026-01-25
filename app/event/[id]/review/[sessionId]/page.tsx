@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { uploadToS3 } from '@/lib/aws';
+import { uploadQueue } from '@/lib/upload-queue';
 import { Event } from '@/types/event';
 import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader';  // Ajout de l'import du loader
@@ -127,74 +127,49 @@ export default function EventReviewPage() {
     if (!videoUrl || !sessionId) return;
 
     try {
-      // Activer à la fois l'indicateur d'upload et le loader de transition
+      // Activer l'indicateur de transition (rapide)
       setIsUploading(true);
       setShowUploadLoader(true);
       setUploadError(null);
       setUploadStep("Préparation de votre vidéo...");
-      setUploadProgress(10);
+      setUploadProgress(50);
+      
+      // Sauvegarder l'URL locale
+      const tempLocalUrl = videoUrl;
+      sessionStorage.setItem('video-local-url', tempLocalUrl);
       
       // Vérifier si on est en ligne
       const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : false;
       console.log('[Review] Online status:', isOnline);
       
-      // Use the raw video URL from the recording which should already have the logo embedded
-      const tempLocalUrl = videoUrl;
-      sessionStorage.setItem('video-local-url', tempLocalUrl);
-      
-      let finalVideoUrl = tempLocalUrl;
-      
       if (isOnline) {
-        setUploadStep("Téléchargement de votre vidéo...");
-        setUploadProgress(25);
+        // 🚀 Upload en arrière-plan via la queue
+        console.log('[Review] Ajout de la vidéo à la queue d\'upload...');
+        setUploadStep("Envoi en cours en arrière-plan...");
+        setUploadProgress(70);
         
-        try {
-          // Fetch the video blob directly - this should contain the logo already embedded
-          // because it was drawn on the canvas during recording
-          const response = await fetch(videoUrl);
-          if (!response.ok) {
-            throw new Error('Impossible de charger la vidéo locale');
-          }
-          const blob = await response.blob();
-          
-          // Nouveau format de nom de fichier qui inclut l'ID de l'événement
-          const filename = `karaoke-videos/event_${id}/${sessionId}-${Date.now()}.webm`;
-
-          setUploadStep("Sauvegarde de votre performance...");
-          setUploadProgress(50);
-          console.log("Uploading video with embedded logo to S3...");
-          const s3Url = await uploadToS3(blob, filename);
-          
-          if (s3Url) {
-            // Successfully uploaded to S3
-            console.log("Video with logo uploaded successfully to:", s3Url);
-            sessionStorage.setItem('video-s3-url', s3Url);
-            finalVideoUrl = s3Url;
-          } else {
-            throw new Error('S3 upload returned no URL');
-          }
-        } catch (uploadError) {
-          console.warn('Upload S3 failed, will use local URL:', uploadError);
-          // Continue with local URL if S3 upload fails
-          finalVideoUrl = tempLocalUrl;
-        }
+        // Ajouter à la queue - l'upload se fera en arrière-plan
+        uploadQueue.addToQueue(
+          sessionId as string,
+          id as string,
+          videoUrl
+        );
+        
+        console.log('[Review] Vidéo ajoutée à la queue, redirection immédiate...');
       } else {
         console.log('[Review] Offline mode - using local blob URL');
         setUploadStep("Mode hors-ligne détecté...");
-        setUploadProgress(30);
-        // En offline, on utilise la version locale
-        finalVideoUrl = tempLocalUrl;
       }
       
       // Préparation de la redirection
       setUploadStep("Génération du QR code de partage...");
       setUploadProgress(90);
       
-      // Attendre un peu avant de rediriger pour que l'utilisateur puisse voir la progression
+      // Redirection rapide avec l'URL locale
+      // La page QR vérifiera si l'upload S3 est terminé et utilisera cette URL
       setTimeout(() => {
-        // Rediriger vers la page QR avec l'ID de l'événement et l'URL finale (qui peut être blob ou S3)
-        router.push(`/event/${id}/qr/${sessionId}?pageUrl=${encodeURIComponent(finalVideoUrl)}`);
-      }, 800);
+        router.push(`/event/${id}/qr/${sessionId}?pageUrl=${encodeURIComponent(tempLocalUrl)}`);
+      }, 500);
     } catch (error) {
       console.error('Erreur lors du traitement de la vidéo :', error);
       setUploadError(error instanceof Error ? error.message : "Erreur inconnue pendant le traitement");

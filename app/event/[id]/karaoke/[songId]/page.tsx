@@ -6,7 +6,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getSongUrl } from '@/services/s3Service';
 import { Event } from '@/types/event';
 import { useOnlineStatus, useIndexedDB } from '@/hooks/useOfflineMode';
-import { loadEventWithOfflineFallback } from '@/lib/offline/eventLoader';
+import { loadEventWithOfflineFallback, getOfflineVideoUrlFromManifest, isOfflinePackage } from '@/lib/offline/eventLoader';
 
 export default function EventKaraokePage() {
   const { id, songId } = useParams();
@@ -27,16 +27,17 @@ export default function EventKaraokePage() {
 
   // "Retour" button handler - Make sure to include the event ID
   const handleReturn = () => {
+    // En mode kiosk ou hors ligne, utiliser MPA navigation pour éviter les erreurs RSC
+    const useHardNav = isOfflinePackage() || !navigator.onLine;
     if (id) {
-      // En hors ligne, utiliser MPA navigation pour éviter les erreurs RSC
-      if (!navigator.onLine) {
+      if (useHardNav) {
         window.location.href = `/event/${id}`;
       } else {
         router.push(`/event/${id}`);
       }
     } else {
       // Fallback to home if no ID
-      if (!navigator.onLine) {
+      if (useHardNav) {
         window.location.href = '/';
       } else {
         router.push('/');
@@ -86,8 +87,23 @@ export default function EventKaraokePage() {
         setLoading(true);
         setVideoReady(false);
         
-        // If offline, try to load from IndexedDB
-        if (!isOnline) {
+        // 🔌 Mode Kiosk Electron: charger depuis le manifest offline en priorité
+        const isKioskMode = isOfflinePackage();
+        if (isKioskMode) {
+          console.log('[EventKaraoke] 🔌 Mode Kiosk détecté - chargement vidéo depuis manifest offline');
+          const offlineVideoUrl = await getOfflineVideoUrlFromManifest(decodedSongId);
+          if (offlineVideoUrl) {
+            console.log('[EventKaraoke] ✅ Vidéo offline trouvée:', offlineVideoUrl);
+            setVideoUrl(offlineVideoUrl);
+            setVideoReady(true);
+            setLoading(false);
+            return;
+          }
+          console.warn('[EventKaraoke] ⚠️ Vidéo non trouvée dans manifest, tentative IndexedDB...');
+        }
+        
+        // If offline (navigator.onLine false or kiosk mode), try to load from IndexedDB
+        if (!isOnline || isKioskMode) {
           console.log('[EventKaraoke] Offline mode - trying IndexedDB');
           try {
             // For offline, we need to get the song from IndexedDB

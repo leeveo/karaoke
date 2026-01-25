@@ -87,6 +87,21 @@ function EventPageContent() {
   const router = useRouter();
   const { isOffline } = useOfflineMode();
   
+  // Détection du mode offline package (Electron via window.offlineKiosk ou localStorage)
+  const [isOfflinePackage, setIsOfflinePackage] = useState(false);
+  
+  useEffect(() => {
+    // Méthode 1: window.offlineKiosk exposé par preload.js d'Electron
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isElectron = !!(window as any).offlineKiosk?.ready;
+    // Méthode 2: localStorage pour tests
+    const forceOffline = localStorage.getItem('forceOfflineMode') === 'true';
+    if (isElectron || forceOffline) {
+      console.log('[EventPage] 🔴 Mode offline package détecté (offlineKiosk:', isElectron, ', localStorage:', forceOffline, ')');
+      setIsOfflinePackage(true);
+    }
+  }, []);
+  
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,9 +236,11 @@ function EventPageContent() {
     async function loadEvent() {
       if (id) {
         try {
-          // Try offline first if offline mode enabled or no internet
-          if (isOffline || !navigator.onLine) {
-            console.log('[EventPage] Offline mode - trying IndexedDB');
+          // Try offline first if offline package mode OR context says offline
+          const shouldUseOffline = isOfflinePackage || isOffline;
+          
+          if (shouldUseOffline) {
+            console.log('[EventPage] 🔴 Offline mode - trying IndexedDB (isOfflinePackage:', isOfflinePackage, ', isOffline:', isOffline, ')');
             const offlineEvent = await getOfflineEvent(id);
             
             if (offlineEvent) {
