@@ -40,8 +40,8 @@ export default function EventReviewPage() {
           return;
         }
 
-        const primaryColor = eventData.customization.primary_color || '#0334b9';
-        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+        const primaryColor = eventData.customization.primary_color || '#8b7355';
+        const secondaryColor = eventData.customization.secondary_color || '#c9a875';
 
         document.documentElement.style.setProperty('--primary-color', primaryColor);
         document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
@@ -337,7 +337,7 @@ export default function EventReviewPage() {
                 rounded-2xl shadow-2xl transition-all duration-300 flex items-center gap-3
               `}
               style={{ 
-                background: 'var(--secondary-gradient)',
+                background: 'var(--primary-gradient)',
                 color: 'white',
                 border: '2px solid rgba(255, 255, 255, 0.2)'
               }}

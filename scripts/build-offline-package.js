@@ -333,8 +333,9 @@ async function main() {
     description: event.description || '',
     date: event.date,
     customization: {
-      primary_color: event.customization?.primary_color || '#0334b9',
-      secondary_color: event.customization?.secondary_color || '#2fb9db',
+      primary_color: event.customization?.primary_color,
+      secondary_color: event.customization?.secondary_color,
+      style_pack: event.customization?.style_pack || '2sevres',
     },
     assets: eventAssets,
   };

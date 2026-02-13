@@ -1,25 +1,36 @@
 /* Ce fichier est désormais fusionné dans app\globals.css, vous pouvez le supprimer */
 
+/* Prévention du flash bleu - Fond sombre appliqué immédiatement */
+html {
+  background-color: #080424 !important;
+  min-height: 100vh;
+}
+
+body {
+  background-color: #080424 !important;
+  min-height: 100vh;
+}
+
 /* Global Design Variables - Edit these to change app appearance */
 :root {
-  /* Primary Theme Colors - CHANGE THESE TO UPDATE THE ENTIRE THEME */
-  --primary-color: #0334b9;      
-  --primary-light: #4667d1;       /* Lighter variant automatically calculated */
-  --primary-dark: #6d86cc;        /* Darker variant automatically calculated */
+  /* Primary Theme Colors - COULEURS NEUTRES CHAUDES PAR DÉFAUT */
+  --primary-color: #8b7355;      
+  --primary-light: #a38a6f;       /* Lighter variant automatically calculated */
+  --primary-dark: #6b5742;        /* Darker variant automatically calculated */
   
-  /* Secondary Theme Colors - CHANGE THESE TO UPDATE THE ENTIRE THEME */
-  --secondary-color: #2fb9db;     
-  --secondary-light: #f472b6;     
-  --secondary-dark: #db2777;      
+  /* Secondary Theme Colors - COULEURS NEUTRES CHAUDES PAR DÉFAUT */
+  --secondary-color: #c9a875;     
+  --secondary-light: #d9b885;     
+  --secondary-dark: #b99865;      
   
   /* Gradients that use the theme colors */
   --primary-gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
   --secondary-gradient: linear-gradient(135deg, var(--secondary-color) 0%, var(--secondary-dark) 100%);
   
-  /* Background Settings */
-  --bg-image: url('/bg.png');
+  /* Background Settings - PAS D'IMAGE PAR DÉFAUT */
+  --bg-image: linear-gradient(135deg, #080424 0%, #160e40 100%);
   --bg-overlay-from: rgba(0, 0, 0, 0.8);
-  --bg-overlay-to: rgba(3, 52, 185, 0.4); /* Uses primary color with opacity */
+  --bg-overlay-to: rgba(8, 4, 36, 0.4);
   --bg-overlay-gradient: linear-gradient(to bottom, var(--bg-overlay-from), var(--bg-overlay-to));
   
   /* Text Colors */

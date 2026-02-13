@@ -7,11 +7,15 @@ import ColorPicker from '../ui/ColorPicker';
 import TemplateSelector from './TemplateSelector';
 import { fetchTemplates } from '@/lib/supabase/templates';
 import Image from 'next/image';
+import { DEFAULT_STYLE_PACK_ID, listStylePacks, type StylePackDefinition } from '@/lib/stylePacks';
+import StylePackPreviewModal from './StylePackPreviewModal';
 
 interface EventFormProps {
   onSubmit: (data: EventInput) => void;
   initialData?: EventInput;
 }
+
+const availableStylePacks = listStylePacks();
 
 const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   // Form state
@@ -24,6 +28,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
         secondary_color: '#2fb9db',
         background_image: '',
         logo: '',
+        style_pack: DEFAULT_STYLE_PACK_ID,
       }
     }
   );
@@ -34,6 +39,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [selectedPackForPreview, setSelectedPackForPreview] = useState<StylePackDefinition | null>(null);
 
   // Mettre à jour formValues quand initialData change
   useEffect(() => {
@@ -47,10 +54,37 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
       
       setFormValues({
         ...initialData,
-        date: cleanDate
+        date: cleanDate,
+        customization: {
+          ...initialData.customization,
+          style_pack: initialData.customization?.style_pack || DEFAULT_STYLE_PACK_ID,
+        }
       });
     }
   }, [initialData]);
+  const currentStylePackId = formValues.customization?.style_pack || DEFAULT_STYLE_PACK_ID;
+
+  const handleStylePackSelect = (stylePackId: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      customization: {
+        ...prev.customization,
+        style_pack: stylePackId,
+      },
+    }));
+  };
+
+  const handleOpenPreview = (pack: StylePackDefinition, e: React.MouseEvent) => {
+    e.stopPropagation(); // Empêcher la sélection du pack
+    setSelectedPackForPreview(pack);
+    setPreviewModalOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewModalOpen(false);
+    setSelectedPackForPreview(null);
+  };
+
 
   // Load templates on component mount
   useEffect(() => {
@@ -272,7 +306,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
         primary_color: formValues.customization?.primary_color || '#0334b9',
         secondary_color: formValues.customization?.secondary_color || '#2fb9db',
         background_image: formValues.customization?.background_image || null,
-        logo: formValues.customization?.logo || null
+        logo: formValues.customization?.logo || null,
+        style_pack: formValues.customization?.style_pack || DEFAULT_STYLE_PACK_ID,
       }
     };
     
@@ -281,6 +316,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 max-w-8xl mx-auto space-y-8">
       <h2 className="text-2xl font-bold text-gray-800 mb-2">Informations événement</h2>
       <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-lg shadow">
@@ -330,6 +366,106 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        </div>
+      </div>
+
+      {/* Style Pack Selection */}
+      <div className="mt-8">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Pack visuel</h3>
+        <p className="text-gray-600 mb-4">Choisissez un univers graphique. Le pack contrôle l&apos;ambiance des cartes catégories, les textures et certaines animations.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {availableStylePacks.map((pack) => {
+            const isActive = pack.id === currentStylePackId;
+            return (
+              <div
+                key={pack.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleStylePackSelect(pack.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleStylePackSelect(pack.id);
+                  }
+                }}
+                className={`text-left rounded-2xl border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${
+                  isActive
+                    ? 'border-blue-500 shadow-[0_15px_40px_rgba(37,99,235,0.35)]'
+                    : 'border-gray-200 hover:border-blue-300 hover:shadow-lg'
+                }`}
+              >
+                <div
+                  className="h-32 w-full rounded-t-2xl"
+                  style={{
+                    backgroundImage: pack.previewBackground,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                ></div>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-lg font-semibold text-gray-900">{pack.name}</h4>
+                    {isActive && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-600 font-medium">Sélectionné</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1 mb-3">{pack.description}</p>
+                  
+                  {/* Aperçus visuels */}
+                  {(pack.previewCategoryImage || pack.previewSongImage) && (
+                    <div className="mt-3 mb-3">
+                      <p className="text-xs text-gray-500 mb-2 font-medium">Aperçu des visuels :</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {pack.previewCategoryImage && (
+                          <div className="relative">
+                            <img 
+                              src={pack.previewCategoryImage} 
+                              alt="Catégorie" 
+                              className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="absolute bottom-1 left-1 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded">Catégorie</span>
+                          </div>
+                        )}
+                        {pack.previewSongImage && (
+                          <div className="relative">
+                            <img 
+                              src={pack.previewSongImage} 
+                              alt="Chanson" 
+                              className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="absolute bottom-1 left-1 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded">Chanson</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Bouton "Voir toutes les vignettes" */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenPreview(pack, e)}
+                        className="w-full mt-2 py-2 px-3 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-all"
+                      >
+                        🔍 Voir toutes les vignettes
+                      </button>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {pack.tags.map((tag) => (
+                      <span key={tag} className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -491,6 +627,16 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, initialData }) => {
         </button>
       </div>
     </form>
+
+    {/* Modal de prévisualisation des visuels */}
+    {selectedPackForPreview && (
+      <StylePackPreviewModal
+        pack={selectedPackForPreview}
+        isOpen={previewModalOpen}
+        onClose={handleClosePreview}
+      />
+    )}
+    </>
   );
 };
 

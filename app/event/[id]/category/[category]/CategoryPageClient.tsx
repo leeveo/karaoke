@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Song } from '@/services/s3Service';
 import { motion } from 'framer-motion';
 import { fetchEventById } from '@/lib/supabase/events';
@@ -11,14 +11,19 @@ import { getOfflineEvent } from '@/lib/offline/db';
 import { useIndexedDB } from '@/hooks/useOfflineMode';
 import MusicTransitionLoader from '@/components/MusicTransitionLoader';
 import { Swiper, SwiperSlide } from 'swiper/react';
+import type { Swiper as SwiperInstance } from 'swiper/types';
 import { EffectCoverflow, Autoplay, Navigation, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/effect-coverflow';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import './swiper-custom.css';
+import { applyStylePackCssVariables, DEFAULT_STYLE_PACK_ID, resolveSongImage } from '@/lib/stylePacks';
 
 const FALLBACK_BACKGROUND_GRADIENT = 'linear-gradient(135deg, #080424 0%, #160e40 100%)';
+const CRITICAL_SLIDES_TO_CONFIRM = 5;
+const SWIPER_READY_FAILSAFE_MS = 3500;
+const INITIAL_SWIPER_BATCH = 14;
 
 type OfflineManifestAssets = {
   logoPath?: string | null;
@@ -28,6 +33,7 @@ type OfflineManifestAssets = {
 type OfflineManifestCustomization = {
   primary_color?: string;
   secondary_color?: string;
+  style_pack?: string;
 };
 
 type OfflineManifestEvent = {
@@ -130,12 +136,13 @@ function buildEventFromManifest(manifestEvent: OfflineManifestEvent, fallbackId:
     user_id: 'offline',
     is_active: true,
     customization: {
-      primary_color: customization.primary_color || '#0334b9',
-      secondary_color: customization.secondary_color || '#2fb9db',
+      primary_color: customization.primary_color,
+      secondary_color: customization.secondary_color,
       background_image: null,
       backgroundImageUrl: toOfflineAssetUrl(assets.backgroundPath),
       logo: null,
       logoUrl: toOfflineAssetUrl(assets.logoPath),
+      style_pack: customization.style_pack || DEFAULT_STYLE_PACK_ID,
     },
   };
 }
@@ -305,20 +312,86 @@ export default function EventCategoryPageClient({
   const [error, setError] = useState<string | null>(null);
   const [isSongsLoading, setIsSongsLoading] = useState(true);
   const [isImagePreloading, setIsImagePreloading] = useState(false);
+  const [isSwiperReady, setIsSwiperReady] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [imageProgress, setImageProgress] = useState({ loaded: 0, total: 0 });
-  const [imageRenderProgress, setImageRenderProgress] = useState({ loaded: 0, total: 0 });
   const [animationsReady, setAnimationsReady] = useState(false);
+  const [activeSongKey, setActiveSongKey] = useState<string | null>(null);
+  const [imageProgress, setImageProgress] = useState({ loaded: 0, total: 0 });
   const renderedImagesRef = useRef<Set<string>>(new Set());
-  const loaderStartRef = useRef<number | null>(null);
-  const renderFailsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const IMAGE_RENDER_FAILSAFE_MS = 3500;
-  const isLoading = isSongsLoading || isImagePreloading;
-  const totalImagesToLoad = imageRenderProgress.total || imageProgress.total;
-  const displayedImageLoaded = imageRenderProgress.total
-    ? imageRenderProgress.loaded
-    : imageProgress.loaded;
+  const swiperReadyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swiperInstanceRef = useRef<SwiperInstance | null>(null);
+  const isLoading = isSongsLoading || isImagePreloading || !isSwiperReady;
+  
+  // Enrichir les chansons avec les bonnes images selon le style pack
+  const songsWithPackImages = useMemo(() => {
+    if (!songs.length) {
+      return songs;
+    }
+    
+    const stylePackId = event?.customization?.style_pack;
+    
+    // Si pas de style pack ou si c'est le pack par défaut, utiliser les images S3
+    if (!stylePackId || stylePackId === DEFAULT_STYLE_PACK_ID) {
+      return songs;
+    }
+    
+    // Sinon, utiliser les images du pack local (priorité sur S3)
+    return songs.map((song) => ({
+      ...song,
+      imageUrl: resolveSongImage(stylePackId, song.key),
+    }));
+  }, [songs, event?.customization?.style_pack]);
+
+  const swiperSongs = useMemo(() => {
+    if (isSwiperReady || songsWithPackImages.length <= INITIAL_SWIPER_BATCH) {
+      return songsWithPackImages;
+    }
+    return songsWithPackImages.slice(0, INITIAL_SWIPER_BATCH);
+  }, [songsWithPackImages, isSwiperReady]);
+
+  const enableSwiperLoop = isSwiperReady && songsWithPackImages.length > 3;
+  const swiperEffect = isSwiperReady ? 'coverflow' : 'slide';
+  const swiperAutoplay = isSwiperReady
+    ? {
+        delay: 4000,
+        disableOnInteraction: false,
+      }
+    : undefined;
+  const coverflowConfig = isSwiperReady
+    ? {
+        rotate: 15,
+        stretch: 0,
+        depth: 200,
+        modifier: 1.5,
+        slideShadows: false,
+      }
+    : undefined;
+  const imageLoadingStrategy = isSwiperReady ? 'eager' : 'lazy';
+  const imageFetchPriority: 'high' | 'low' | 'auto' = isSwiperReady ? 'high' : 'auto';
+  const updateActiveSlideFromInstance = useCallback((instance?: SwiperInstance | null) => {
+    const swiper = instance ?? swiperInstanceRef.current;
+    if (!swiper) {
+      return;
+    }
+    const activeSlide = swiper.slides?.[swiper.activeIndex];
+    const slideKey = activeSlide?.getAttribute?.('data-song-key');
+    if (slideKey) {
+      setActiveSongKey(slideKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!swiperSongs.length) {
+      setActiveSongKey(null);
+      return;
+    }
+    setActiveSongKey(swiperSongs[0].key);
+    updateActiveSlideFromInstance();
+  }, [swiperSongs, updateActiveSlideFromInstance]);
+  
+  const totalImagesToLoad = imageProgress.total;
+  const displayedImageLoaded = imageProgress.loaded;
   const loaderPercent = totalImagesToLoad
     ? Math.min(100, Math.max(8, (displayedImageLoaded / totalImagesToLoad) * 100))
     : 20;
@@ -328,19 +401,41 @@ export default function EventCategoryPageClient({
     setError(null);
     setIsSongsLoading(false);
     setIsImagePreloading(true);
+    setIsSwiperReady(false);
   };
 
   const stopLoadingStates = () => {
     setIsSongsLoading(false);
     setIsImagePreloading(false);
+    setIsSwiperReady(true);
   };
 
-  const handleSlideImageRendered = (url?: string | null) => {
-    if (!url) {
+  const confirmSwiperReady = useCallback((reason: string) => {
+    setIsSwiperReady((prev) => {
+      if (!prev) {
+        console.log(`[CategoryPage][Swiper] ✅ prêt (${reason})`);
+      }
+      return true;
+    });
+    setIsImagePreloading(false);
+    setImageProgress((prev) => {
+      if (!prev.total) {
+        return prev;
+      }
+      return { ...prev, loaded: prev.total };
+    });
+    if (swiperReadyTimeoutRef.current) {
+      clearTimeout(swiperReadyTimeoutRef.current);
+      swiperReadyTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleSlideImageRendered = useCallback((url?: string | null) => {
+    if (!url || isSwiperReady) {
       return;
     }
 
-    setImageRenderProgress((prev) => {
+    setImageProgress((prev) => {
       if (prev.total === 0 || renderedImagesRef.current.has(url)) {
         return prev;
       }
@@ -348,10 +443,17 @@ export default function EventCategoryPageClient({
       renderedImagesRef.current.add(url);
 
       const nextLoaded = Math.min(prev.total, prev.loaded + 1);
-      console.log('[CategoryPage][Render] Image confirmée', { url, count: nextLoaded, target: prev.total });
+      if (nextLoaded <= 3 || nextLoaded === prev.total) {
+        console.log('[CategoryPage][Render] Image confirmée', { url, count: nextLoaded, target: prev.total });
+      }
+
+      if (prev.total > 0 && nextLoaded >= prev.total) {
+        confirmSwiperReady(`images ${nextLoaded}/${prev.total}`);
+      }
+
       return { ...prev, loaded: nextLoaded };
     });
-  };
+  }, [confirmSwiperReady, isSwiperReady]);
 
   // Récupérer les paramètres depuis Promise
   useEffect(() => {
@@ -360,33 +462,77 @@ export default function EventCategoryPageClient({
       setCategory(p.category);
     });
   }, [params]);
+  
+  useEffect(() => {
+    if (swiperReadyTimeoutRef.current) {
+      clearTimeout(swiperReadyTimeoutRef.current);
+      swiperReadyTimeoutRef.current = null;
+    }
+
+    if (isSongsLoading) {
+      setIsSwiperReady(false);
+      return;
+    }
+
+    renderedImagesRef.current.clear();
+
+    if (!songsWithPackImages.length) {
+      setImageProgress({ loaded: 0, total: 0 });
+      confirmSwiperReady('aucune-chanson');
+      return;
+    }
+
+    const preloadableImages = songsWithPackImages.filter((song) => Boolean(song.imageUrl));
+    const criticalSlides = Math.min(
+      preloadableImages.length || songsWithPackImages.length,
+      CRITICAL_SLIDES_TO_CONFIRM
+    );
+    setImageProgress({ loaded: 0, total: criticalSlides });
+    setIsImagePreloading(true);
+    setIsSwiperReady(false);
+
+    swiperReadyTimeoutRef.current = setTimeout(() => {
+      console.warn('[CategoryPage][Swiper] ⏳ Failsafe - affichage forcé');
+      confirmSwiperReady('failsafe');
+    }, SWIPER_READY_FAILSAFE_MS);
+
+    return () => {
+      if (swiperReadyTimeoutRef.current) {
+        clearTimeout(swiperReadyTimeoutRef.current);
+        swiperReadyTimeoutRef.current = null;
+      }
+    };
+  }, [songsWithPackImages, isSongsLoading, confirmSwiperReady]);
 
   useEffect(() => {
     setAnimationsReady(true);
-  }, []);
+    // Précharger toutes les images en parallèle
+    const preloadPromises = songsWithPackImages
+      .filter(song => song.imageUrl)
+      .map(song => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.src = song.imageUrl!;
+          img.onload = () => {
+            console.log(`[CategoryPage][Preload] ✅ ${song.title}`);
+            resolve();
+          };
+          img.onerror = () => {
+            console.warn(`[CategoryPage][Preload] ❌ ${song.title}`);
+            resolve(); // Continuer même en cas d'erreur
+          };
+        });
+      });
+    
+    Promise.all(preloadPromises).then(() => {
+      console.log(`[CategoryPage][Preload] ✅ Toutes les images préchargées`);
+    });
+  }, [songsWithPackImages]);
 
   const setFallbackBackground = () => {
     document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
     setBgLoaded(true);
   };
-
-  useEffect(() => {
-    if (!isImagePreloading || imageRenderProgress.total === 0) {
-      return;
-    }
-
-    if (imageRenderProgress.loaded >= imageRenderProgress.total) {
-      const duration = loaderStartRef.current ? Date.now() - loaderStartRef.current : null;
-      console.log('[CategoryPage][Loader] Confirmation atteinte', {
-        loaded: imageRenderProgress.loaded,
-        target: imageRenderProgress.total,
-        durationMs: duration
-      });
-      loaderStartRef.current = null;
-      const handle = setTimeout(() => setIsImagePreloading(false), 200);
-      return () => clearTimeout(handle);
-    }
-  }, [imageRenderProgress, isImagePreloading]);
 
   const preloadBackgroundImage = (bgUrl: string) => {
     const img = new Image();
@@ -409,8 +555,10 @@ export default function EventCategoryPageClient({
       return;
     }
 
-    const primaryColor = customization.primary_color || '#0334b9';
-    const secondaryColor = customization.secondary_color || '#2fb9db';
+    const primaryColor = customization.primary_color || '#8b7355';
+    const secondaryColor = customization.secondary_color || '#c9a875';
+
+    applyStylePackCssVariables(customization.style_pack);
 
     console.log('Application de la couleur primaire:', primaryColor);
     document.documentElement.style.setProperty('--primary-color', primaryColor);
@@ -422,6 +570,42 @@ export default function EventCategoryPageClient({
     document.documentElement.style.setProperty('--secondary-color', secondaryColor);
     document.documentElement.style.setProperty('--secondary-light', adjustColorLightness(secondaryColor, 20));
     document.documentElement.style.setProperty('--secondary-dark', adjustColorLightness(secondaryColor, -20));
+    
+    // Définir les valeurs RGB pour rgba()
+    const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+      try {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : null;
+      } catch {
+        return null;
+      }
+    };
+    
+    const primaryRgb = hexToRgb(primaryColor);
+    if (primaryRgb) {
+      document.documentElement.style.setProperty('--primary-color-rgb', `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`);
+    }
+    const secondaryRgb = hexToRgb(secondaryColor);
+    if (secondaryRgb) {
+      document.documentElement.style.setProperty('--secondary-rgb', `${secondaryRgb.r}, ${secondaryRgb.g}, ${secondaryRgb.b}`);
+    }
+
+    // 💾 Sauvegarder les couleurs en sessionStorage pour les prochaines navigations
+    try {
+      sessionStorage.setItem(`event-${eventData.id}-colors`, JSON.stringify({
+        primaryColor,
+        secondaryColor,
+        stylePack: customization.style_pack,
+        backgroundImageUrl: customization.backgroundImageUrl
+      }));
+      console.log('[CategoryPage] 💾 Couleurs sauvegardées en sessionStorage');
+    } catch (e) {
+      console.warn('Could not save event colors to sessionStorage:', e);
+    }
 
     document.documentElement.style.setProperty(
       '--primary-gradient', 
@@ -459,6 +643,7 @@ export default function EventCategoryPageClient({
         setFallbackBackground();
       }
     } else {
+      applyStylePackCssVariables(undefined);
       console.log('No background_image found, using default gradient');
       setFallbackBackground();
     }
@@ -568,6 +753,7 @@ export default function EventCategoryPageClient({
         // Use local state instead of global loader
         setIsSongsLoading(true);
         setIsImagePreloading(true);
+        setIsSwiperReady(false);
         if (category) {
           console.log(`[CategoryPage] Fetching songs for category: ${category}`);
           const s3FolderCategory = mapCategoryToS3Folder(category);
@@ -698,183 +884,7 @@ export default function EventCategoryPageClient({
     fetchSongs();
   }, [category, loadOfflineSongsByCategory]);
 
-  // Précharger toutes les images nécessaires avant de permettre la sélection
-  // Optimisé: priorité aux premières images visibles, concurrence accrue
-  useEffect(() => {
-    let cancelled = false;
 
-    if (!songs.length) {
-      loaderStartRef.current = null;
-      setIsImagePreloading(false);
-      setImageProgress({ loaded: 0, total: 0 });
-      setImageRenderProgress({ loaded: 0, total: 0 });
-      return;
-    }
-
-    const images = songs
-      .map((song, idx) => ({ url: song.imageUrl, priority: idx }))
-      .filter((item): item is { url: string; priority: number } => Boolean(item.url));
-
-    const uniqueImages = Array.from(
-      new Map(images.map((item) => [item.url, item])).values()
-    );
-
-    if (!uniqueImages.length) {
-      loaderStartRef.current = null;
-      setIsImagePreloading(false);
-      setImageProgress({ loaded: 0, total: 0 });
-      setImageRenderProgress({ loaded: 0, total: 0 });
-      return;
-    }
-
-    // Prioritize first 5 images (visible in carousel)
-    const priorityImages = uniqueImages.slice(0, 5);
-    const remainingImages = uniqueImages.slice(5);
-
-    const renderConfirmationTarget = Math.min(
-      uniqueImages.length,
-      Math.max(4, Math.min(16, Math.ceil(uniqueImages.length * 0.15)))
-    );
-
-    console.log('[CategoryPage][Images] Préchargement démarré', {
-      totalUnique: uniqueImages.length,
-      priority: priorityImages.length,
-      remaining: remainingImages.length,
-      renderTarget: renderConfirmationTarget
-    });
-
-    loaderStartRef.current = Date.now();
-
-    setIsImagePreloading(true);
-    setImageProgress({ loaded: 0, total: uniqueImages.length });
-    setImageRenderProgress({ loaded: 0, total: renderConfirmationTarget });
-    renderedImagesRef.current.clear();
-
-    const concurrency = 8; // Increased from 4 to 8 for faster loading
-    let loaded = 0;
-
-    const loadImage = (url: string) =>
-      new Promise<void>((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 2;
-
-        const finalize = () => {
-          loaded += 1;
-          if (!cancelled) {
-            setImageProgress({ loaded, total: uniqueImages.length });
-          }
-          resolve();
-        };
-
-        const attemptLoad = () => {
-          const img = new Image();
-          img.decoding = 'async'; // Enable async decoding
-          img.onload = finalize;
-          img.onerror = () => {
-            attempts += 1;
-            if (attempts < maxAttempts) {
-              setTimeout(attemptLoad, 150);
-              return;
-            }
-            // Fallback: fetch image to warm cache before marking complete
-            fetch(url)
-              .then((res) => {
-                if (!res.ok) throw new Error('fetch failed');
-                return res.blob();
-              })
-              .catch(() => null)
-              .finally(finalize);
-          };
-          img.src = url;
-        };
-
-        attemptLoad();
-      });
-
-    // Load priority images first, then remaining
-    const loadSequence = async () => {
-      // Priority batch (first 3 immediately)
-      const priorityBatch = priorityImages.slice(0, 3).map(item => loadImage(item.url));
-      await Promise.all(priorityBatch);
-
-      // Remaining priority images
-      const nextPriority = priorityImages.slice(3).map(item => loadImage(item.url));
-      await Promise.all(nextPriority);
-
-      // Load remaining images with worker pool
-      let index = 0;
-      const workers = Array.from({ length: Math.min(concurrency, remainingImages.length) }, async () => {
-        while (true) {
-          const currentIndex = index;
-          index += 1;
-          if (currentIndex >= remainingImages.length || cancelled) {
-            return;
-          }
-          const item = remainingImages[currentIndex];
-          await loadImage(item.url);
-        }
-      });
-
-      await Promise.all(workers);
-    };
-
-    loadSequence()
-      .then(() => {
-        if (!cancelled) {
-          console.log('[CategoryPage] ✅ Préchargement des images terminé');
-        }
-      })
-      .catch((err) => {
-        console.error('[CategoryPage] Erreur préchargement images:', err);
-        if (!cancelled) {
-          setIsImagePreloading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [songs]);
-
-  useEffect(() => {
-    if (!isImagePreloading) {
-      if (renderFailsafeRef.current) {
-        clearTimeout(renderFailsafeRef.current);
-        renderFailsafeRef.current = null;
-      }
-      return;
-    }
-
-    if (!imageRenderProgress.total) {
-      return;
-    }
-
-    if (imageRenderProgress.loaded >= imageRenderProgress.total) {
-      return;
-    }
-
-    const networkAhead = imageProgress.loaded >= Math.min(imageProgress.total || 0, imageRenderProgress.total);
-    if (!networkAhead) {
-      return;
-    }
-
-    if (renderFailsafeRef.current) {
-      return;
-    }
-
-    renderFailsafeRef.current = setTimeout(() => {
-      renderFailsafeRef.current = null;
-      console.warn('[CategoryPage][Render] Failsafe déclenché - confirmation forcée', {
-        networkLoaded: imageProgress.loaded,
-        renderProgress: imageRenderProgress
-      });
-      loaderStartRef.current = null;
-      setImageRenderProgress((prev) => ({ ...prev, loaded: prev.total }));
-      setIsImagePreloading(false);
-    }, IMAGE_RENDER_FAILSAFE_MS);
-
-    return undefined;
-  }, [isImagePreloading, imageProgress, imageRenderProgress]);
 
   // Fonction utilitaire pour ajuster la luminosité d'une couleur hex
   function adjustColorLightness(color: string, percent: number): string {
@@ -913,7 +923,7 @@ export default function EventCategoryPageClient({
 
   // Fonction pour naviguer avec transition
   const handleSongSelect = (songKey: string) => {
-    if (isLoading) {
+    if (isLoading || songKey !== activeSongKey) {
       return;
     }
 
@@ -982,10 +992,21 @@ export default function EventCategoryPageClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 flex items-center justify-center"
+          style={{
+            zIndex: 99999,
+            isolation: 'isolate'
+          }}
         >
-          <div className="absolute inset-0 bg-black/70"></div>
+          <div className="absolute inset-0 backdrop-blur-md"
+            style={{
+              backgroundImage: event?.customization?.backgroundImageUrl 
+                ? `linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('${event.customization.backgroundImageUrl}')`
+                : 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          ></div>
           
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }} 
@@ -996,12 +1017,15 @@ export default function EventCategoryPageClient({
               stiffness: 300, 
               damping: 30 
             }}
-            className="relative z-10 p-8 rounded-xl border border-white/10 shadow-2xl max-w-md w-full mx-4 backdrop-blur-md"
+            className="relative z-10 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4"
             style={{ 
-              backgroundColor: 'var(--primary-color)',
-              boxShadow: '0 20px 60px -10px rgba(var(--primary-color-rgb), 0.4), 0 10px 20px -5px rgba(var(--secondary-color-rgb), 0.3)',
-              borderLeft: '4px solid var(--primary-color)',
-              borderRight: '4px solid var(--secondary-color)'
+              background: 'rgba(20, 20, 30, 0.95)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 60px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.05)',
+              borderLeft: '3px solid var(--primary-color)',
+              borderRight: '3px solid var(--secondary-color)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
             }}
           >
             {/* Vinyl record animation */}
@@ -1210,7 +1234,7 @@ export default function EventCategoryPageClient({
           backgroundPosition: "center"
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-black/70 backdrop-blur-sm"></div>
         
         <div className="relative z-10 w-full h-full flex flex-col py-6 px-4">
           {/* Partie du haut (titre + bouton retour) - reste fixe */}
@@ -1218,7 +1242,7 @@ export default function EventCategoryPageClient({
             <motion.h1 
               initial={{ y: -20 }}
               animate={{ y: 0 }}
-              style={{ color: 'var(--primary-color)' }}
+              style={{ color: 'var(--secondary-color)' }}
               className="text-3xl md:text-4xl font-bold mb-8 text-center"
             >
               {event?.name && (
@@ -1258,7 +1282,8 @@ export default function EventCategoryPageClient({
           
           {/* Zone du slider Swiper - prend tout l'espace restant */}
           <div className="relative flex-grow flex items-center justify-center w-full">
-            {songs.length === 0 ? (
+            {/* Ne rien afficher pendant le chargement - le loader s'occupe de l'affichage */}
+            {isLoading ? null : songsWithPackImages.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1267,52 +1292,67 @@ export default function EventCategoryPageClient({
                 Aucune chanson trouvée dans cette catégorie
               </motion.div>
             ) : (
-              <Swiper
-                effect={'coverflow'}
-                grabCursor={true}
-                centeredSlides={true}
-                slidesPerView={3}
-                spaceBetween={30}
-                loop={true}
-                loopAdditionalSlides={2}
-                watchSlidesProgress={true}
-                autoplay={{
-                  delay: 4000,
-                  disableOnInteraction: false,
-                }}
-                coverflowEffect={{
-                  rotate: 15,
-                  stretch: 0,
-                  depth: 200,
-                  modifier: 1.5,
-                  slideShadows: false,
-                }}
-                navigation={true}
-                pagination={false}
-                modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
-                className="w-full h-full"
-                breakpoints={{
-                  320: { slidesPerView: 1, spaceBetween: 20, loopAdditionalSlides: 1 },
-                  768: { slidesPerView: 2, spaceBetween: 25, loopAdditionalSlides: 1 },
-                  1024: { slidesPerView: 3, spaceBetween: 30, loopAdditionalSlides: 2 },
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  paddingTop: '50px',
-                  paddingBottom: '80px',
-                }}
+                <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: isSwiperReady ? 1 : 0, scale: isSwiperReady ? 1 : 0.96 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                className={`w-full h-full ${isSwiperReady ? '' : 'pointer-events-none'}`}
               >
-                {songs.map((song) => (
-                  <SwiperSlide key={song.key}>
+                <Swiper
+                  effect={swiperEffect}
+                  grabCursor={true}
+                  centeredSlides={true}
+                  slidesPerView={3}
+                  spaceBetween={isSwiperReady ? 30 : 20}
+                  loop={enableSwiperLoop}
+                  loopAdditionalSlides={enableSwiperLoop ? 2 : 0}
+                  watchSlidesProgress={isSwiperReady}
+                  autoplay={swiperAutoplay}
+                  coverflowEffect={coverflowConfig}
+                  speed={isSwiperReady ? 700 : 450}
+                  navigation={true}
+                  pagination={false}
+                  modules={[EffectCoverflow, Autoplay, Navigation, Pagination]}
+                  className="w-full h-full"
+                    onSwiper={(instance: SwiperInstance) => {
+                      swiperInstanceRef.current = instance;
+                      updateActiveSlideFromInstance(instance);
+                    }}
+                    onSlideChange={(instance: SwiperInstance) => {
+                      updateActiveSlideFromInstance(instance);
+                    }}
+                  breakpoints={{
+                    320: { slidesPerView: 1, spaceBetween: 20, loopAdditionalSlides: 1 },
+                    768: { slidesPerView: 2, spaceBetween: 25, loopAdditionalSlides: 1 },
+                    1024: { slidesPerView: 3, spaceBetween: 30, loopAdditionalSlides: 2 },
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    paddingTop: '50px',
+                    paddingBottom: '80px',
+                  }}
+                >
+                  {swiperSongs.map((song) => {
+                    const isActive = song.key === activeSongKey;
+                    const isInteractive = isActive && !isLoading && !isNavigating;
+                    return (
+                  <SwiperSlide key={song.key} data-song-key={song.key}>
                     <motion.div
                       whileHover={{ scale: 1.02, y: -10 }}
                       transition={{ duration: 0.3 }}
-                      className="cursor-pointer h-full w-full flex items-center justify-center"
-                      onClick={() => handleSongSelect(song.key)}
+                      className={`h-full w-full flex items-center justify-center ${isInteractive ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                      onClick={isInteractive ? () => handleSongSelect(song.key) : undefined}
+                      tabIndex={isInteractive ? 0 : -1}
+                      aria-disabled={!isInteractive}
+                      role="button"
+                      style={{ pointerEvents: isInteractive ? 'auto' : 'none' }}
                     >
                       {/* Glassmorphism Card */}
-                      <div className="relative w-full rounded-3xl overflow-hidden group shadow-2xl border border-white" style={{ height: '400px' }}>
+                      <div
+                        className={`relative w-full rounded-3xl overflow-hidden group shadow-2xl border ${isActive ? 'border-white' : 'border-white/30'} ${isActive ? 'scale-100' : 'scale-95 opacity-80'} transition-all duration-300`}
+                        style={{ height: '400px' }}
+                      >
                         {/* Background Image with Blur */}
                         <div className="absolute inset-0">
                           {/* Gradient placeholder (always visible as fallback) */}
@@ -1326,12 +1366,12 @@ export default function EventCategoryPageClient({
                             <img
                               src={song.imageUrl}
                               alt={song.title}
-                              loading="eager"
-                              fetchPriority="high"
+                              loading={imageLoadingStrategy}
+                              fetchPriority={imageFetchPriority}
                               decoding="async"
                               className="absolute inset-0 w-full h-full object-cover"
+                              style={{ imageRendering: 'crisp-edges' }}
                               onLoad={(e) => {
-                                // Remove pulse animation when loaded
                                 const parent = (e.target as HTMLImageElement).parentElement;
                                 const placeholder = parent?.querySelector('.animate-pulse');
                                 if (placeholder) placeholder.classList.remove('animate-pulse');
@@ -1391,7 +1431,7 @@ export default function EventCategoryPageClient({
                             style={{
                               borderColor: 'rgba(255, 255, 255, 0.08)',
                               background: 'linear-gradient(135deg, rgba(12, 17, 32, 0.08), rgba(12, 17, 32, 0.02))',
-                              backdropFilter: 'blur(6px)',
+                              backdropFilter: 'blur(3px)',
                               WebkitBackdropFilter: 'blur(6px)'
                             }}
                           >
@@ -1444,8 +1484,10 @@ export default function EventCategoryPageClient({
                       </div>
                     </motion.div>
                   </SwiperSlide>
-                ))}
-              </Swiper>
+                    );
+                  })}
+                </Swiper>
+              </motion.div>
             )}
           </div>
         </div>

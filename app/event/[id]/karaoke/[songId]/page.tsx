@@ -145,12 +145,18 @@ export default function EventKaraokePage() {
 
   // Move useEffect hooks to the top level
   useEffect(() => {
+    // Remettre isMountedRef à true au début (pour React Strict Mode)
+    isMountedRef.current = true;
+    
     let cancelled = false;
+    const onlineSnapshot = isOnline; // Capture isOnline at mount time
 
     const safeStateUpdate = (updater: () => void) => {
       if (cancelled || !isMountedRef.current) {
+        logLoader('⚠️ safeStateUpdate BLOQUÉ', { cancelled, isMounted: isMountedRef.current });
         return;
       }
+      logLoader('✅ safeStateUpdate EXÉCUTÉ');
       updater();
     };
 
@@ -179,7 +185,7 @@ export default function EventKaraokePage() {
 
         const isKioskMode = isOfflinePackage();
         const normalizedKey = normalizeSongKey(decodedSongId);
-        logLoader('Paramètres réseau', { kiosk: isKioskMode, online: isOnline, key: normalizedKey });
+        logLoader('Paramètres réseau', { kiosk: isKioskMode, online: onlineSnapshot, key: normalizedKey });
 
         if (isKioskMode) {
           logLoader('Mode kiosk actif - tentative manifest offline');
@@ -205,7 +211,7 @@ export default function EventKaraokePage() {
           }
         }
 
-        if (!isOnline || isKioskMode) {
+        if (!onlineSnapshot || isKioskMode) {
           logLoader('Mode offline détecté - tentative IndexedDB');
           try {
             let offlineSong = normalizedKey
@@ -257,7 +263,7 @@ export default function EventKaraokePage() {
         }
 
         if (normalizedKey.startsWith('karaokesaas/')) {
-          logLoader('Tentative de génération URL signée S3');
+          logLoader('🔍 Tentative de génération URL signée S3', { normalizedKey });
           try {
             const s3Url = await withTimeout(
               getSongUrl(normalizedKey),
@@ -266,17 +272,25 @@ export default function EventKaraokePage() {
             );
 
             if (s3Url) {
-              logLoader('URL signée obtenue, lancement du préchargement');
+              logLoader('✅ URL signée obtenue, lancement du préchargement', { urlStart: s3Url.substring(0, 80) });
               safeStateUpdate(() => {
                 setVideoUrl(s3Url);
               });
 
+              logLoader('📹 preloadRef.current existe?', { exists: !!preloadRef.current });
+              
               if (preloadRef.current) {
                 preloadRef.current.src = s3Url;
+                logLoader('🎬 Source vidéo assignée au preloadRef');
 
-                const preloadTimeout = setTimeout(() => {
-                  logLoader('Timeout préchargement vidéo - poursuite sans attendre');
-                  clearTimeout(preloadTimeout);
+                let timeoutCleared = false;
+
+                const preloadTimeout = setTimeout(() => {                  if (timeoutCleared) {
+                    logLoader('⏱️ Timeout ignoré car timeoutCleared=true');
+                    return;
+                  }
+                  logLoader('⏱️ TIMEOUT préchargement (6s) - affichage forcé');
+                  timeoutCleared = true;
                   safeStateUpdate(() => {
                     setVideoReady(true);
                     setLoading(false);
@@ -285,17 +299,30 @@ export default function EventKaraokePage() {
                 }, SIGNED_URL_TIMEOUT_MS);
 
                 preloadRef.current.onloadeddata = () => {
-                  logLoader('Préchargement vidéo terminé (onloadeddata)');
+                  if (timeoutCleared) {
+                    logLoader('✅ onloadeddata ignoré car timeoutCleared=true');
+                    return;
+                  }
+                  logLoader('✅ Préchargement RÉUSSI (onloadeddata) - désactivation timeout');
+                  timeoutCleared = true;
                   clearTimeout(preloadTimeout);
+                  logLoader('📊 État avant update:', { videoReady, loading, cancelled, isMounted: isMountedRef.current });
                   safeStateUpdate(() => {
+                    logLoader('🔄 INSIDE updater - calling setVideoReady(true) et setLoading(false)');
                     setVideoReady(true);
                     setLoading(false);
                   });
+                  logLoader('📊 Après safeStateUpdate');
                   clearLoaderFailsafe();
                 };
 
                 preloadRef.current.onerror = (event) => {
-                  logLoader('Erreur de préchargement vidéo', event);
+                  if (timeoutCleared) {
+                    logLoader('❌ onerror ignoré car timeoutCleared=true');
+                    return;
+                  }
+                  logLoader('❌ ERREUR préchargement vidéo', { event, src: preloadRef.current?.src?.substring(0, 80) });
+                  timeoutCleared = true;
                   clearTimeout(preloadTimeout);
                   safeStateUpdate(() => {
                     setVideoReady(true);
@@ -304,6 +331,7 @@ export default function EventKaraokePage() {
                   clearLoaderFailsafe();
                 };
 
+                logLoader('🚀 Appel de preloadRef.current.load()');
                 preloadRef.current.load();
               } else {
                 logLoader('Référence vidéo indisponible - affichage immédiat');
@@ -350,11 +378,12 @@ export default function EventKaraokePage() {
     loadVideo();
 
     return () => {
+      logLoader('🧹 Cleanup du useEffect - cancelled = true');
       cancelled = true;
       clearLoaderFailsafe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decodedSongId, isOnline]);
+  }, [decodedSongId]);
 
   useEffect(() => {
     return () => {
@@ -381,13 +410,20 @@ export default function EventKaraokePage() {
 
         setEvent(eventData);
 
+        console.log('[EventKaraoke] Event loaded:', {
+          eventId: eventData.id,
+          eventName: eventData.name,
+          logoUrl: eventData.customization?.logoUrl,
+          hasLogo: !!eventData.customization?.logoUrl
+        });
+
         if (!eventData.customization) {
           setBgLoaded(true);
           return;
         }
 
-        const primaryColor = eventData.customization.primary_color || '#0334b9';
-        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+        const primaryColor = eventData.customization.primary_color || '#8b7355';
+        const secondaryColor = eventData.customization.secondary_color || '#c9a875';
 
         document.documentElement.style.setProperty('--primary-color', primaryColor);
         document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
@@ -451,21 +487,6 @@ export default function EventKaraokePage() {
           
           {/* Vidéo cachée pour le préchargement */}
           <video ref={preloadRef} className="hidden" crossOrigin="anonymous" preload="auto" />
-
-          {/* Retour button */}
-          <button 
-            onClick={handleReturn}
-            className="mt-8 px-6 py-3 text-white rounded-lg font-medium transition-all hover:translate-y-[-2px]"
-            style={{ 
-              backgroundColor: 'var(--primary-color-75)',
-              border: 'none',
-              borderLeft: '4px solid var(--primary-color)',
-              borderRight: '4px solid var(--secondary-color)',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)'
-            }}
-          >
-            Retour 
-          </button>
         </div>
       </div>
     );
@@ -511,7 +532,7 @@ export default function EventKaraokePage() {
         transition: "background-image 0.5s ease-in-out"
       }}>
       {/* Overlay avec dégradé */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-black/70 backdrop-blur-sm"></div>
       
       <div className="relative z-10 w-full h-screen flex items-center justify-center px-2 py-2">
         {videoReady ? (

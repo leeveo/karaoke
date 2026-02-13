@@ -49,7 +49,21 @@ export default function CreateEventPage() {
   const handleSubmit = async (eventData: EventInput) => {
     try {
       setIsSubmitting(true);
-      await createEvent(eventData); // Don't save the unused eventId
+      
+      // Vérifier qu'on a bien un user_id
+      if (!user.id) {
+        setError('Utilisateur non authentifié');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Ajouter le user_id aux données
+      const eventDataWithUser = {
+        ...eventData,
+        user_id: user.id
+      };
+      
+      await createEvent(eventDataWithUser); // Don't save the unused eventId
       router.push('/admin/events');
     } catch (error) {
       console.error("Error creating event:", error);

@@ -18,6 +18,7 @@ export interface OfflineEvent {
     backgroundBlob?: Blob;
     backgroundImageBlob?: Blob;
     logoUrl?: string;
+    style_pack?: string;
   };
 }
 

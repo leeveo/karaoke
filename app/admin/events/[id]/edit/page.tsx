@@ -7,6 +7,7 @@ import DownloadProgressModal from '@/components/DownloadProgressModal';
 import SelectiveCategoryDownload from '@/components/SelectiveCategoryDownload';
 import { fetchEventById, updateEvent } from '@/lib/supabase/events';
 import { Event, EventInput } from '@/types/event';
+import { DEFAULT_STYLE_PACK_ID } from '@/lib/stylePacks';
 
 export default function EditEventPage() {
   const [event, setEvent] = useState<Event | null>(null);
@@ -241,11 +242,12 @@ export default function EditEventPage() {
       name: event.name,
       date: event.date,
       // Remove properties not in EventInput type
-      customization: event.customization || {
-        primary_color: '#0334b9',
-        secondary_color: '#2fb9db',
-        background_image: '',
-        logo: ''
+      customization: {
+        primary_color: event.customization?.primary_color || '#0334b9',
+        secondary_color: event.customization?.secondary_color || '#2fb9db',
+        background_image: event.customization?.background_image || '',
+        logo: event.customization?.logo || '',
+        style_pack: event.customization?.style_pack || DEFAULT_STYLE_PACK_ID,
       }
     };
   };

@@ -67,13 +67,13 @@ export default function CategoryPage() {
       animate={{ opacity: 1 }}
       className="app-background flex flex-col items-center justify-center min-h-screen py-12 px-4"
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-black/70 backdrop-blur-sm"></div>
       
       <div className="relative z-10 w-full max-w-3xl">
         <motion.h1 
           initial={{ y: -20 }}
           animate={{ y: 0 }}
-          style={{ color: 'var(--primary-color)' }}
+          style={{ color: 'var(--secondary-color)' }}
           className="text-3xl md:text-4xl font-bold mb-8 text-center"
         >
           SÉLECTIONNE TA CHANSON 

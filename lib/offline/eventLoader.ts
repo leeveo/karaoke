@@ -1,9 +1,10 @@
 import { fetchEventById } from '@/lib/supabase/events';
 import { getOfflineEvent, OfflineEvent } from '@/lib/offline/db';
 import { Event } from '@/types/event';
+import { DEFAULT_STYLE_PACK_ID } from '@/lib/stylePacks';
 
-const FALLBACK_PRIMARY = '#0334b9';
-const FALLBACK_SECONDARY = '#2fb9db';
+const FALLBACK_PRIMARY = '#8b7355';
+const FALLBACK_SECONDARY = '#c9a875';
 const OFFLINE_ASSET_PREFIX = '/_offline/assets/';
 
 interface OfflineManifestAssets {
@@ -14,6 +15,7 @@ interface OfflineManifestAssets {
 interface OfflineManifestCustomization {
   primary_color?: string;
   secondary_color?: string;
+  style_pack?: string;
 }
 
 interface OfflineManifestEvent {
@@ -120,6 +122,7 @@ const buildEventFromManifest = (manifestEvent: OfflineManifestEvent, fallbackId:
       backgroundImageUrl: toOfflineAssetUrl(assets.backgroundPath),
       logo: null,
       logoUrl: toOfflineAssetUrl(assets.logoPath),
+      style_pack: customization.style_pack || DEFAULT_STYLE_PACK_ID,
     },
   };
 };
@@ -154,6 +157,7 @@ const buildEventFromOfflineRecord = (offlineEvent: OfflineEvent): Event => {
       backgroundImageUrl,
       logo: customization.logo || null,
       logoUrl,
+      style_pack: customization.style_pack || DEFAULT_STYLE_PACK_ID,
     },
   };
 };
@@ -173,6 +177,7 @@ const ensureCustomizationDefaults = (eventData: Event | null): Event | null => {
 
   eventData.customization.primary_color = eventData.customization.primary_color || FALLBACK_PRIMARY;
   eventData.customization.secondary_color = eventData.customization.secondary_color || FALLBACK_SECONDARY;
+  eventData.customization.style_pack = eventData.customization.style_pack || DEFAULT_STYLE_PACK_ID;
 
   if (!eventData.customization.backgroundImageUrl && eventData.customization.background_image) {
     const resolved = resolveAssetUrl(eventData.customization.background_image);

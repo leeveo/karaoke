@@ -1,5 +1,6 @@
 import { Event, EventInput } from '@/types/event';
 import { supabase } from './client';
+import { DEFAULT_STYLE_PACK_ID } from '@/lib/stylePacks';
 
 // Récupérer tous les événements avec leur personnalisation
 export async function fetchEvents(): Promise<Event[]> {
@@ -13,7 +14,15 @@ export async function fetchEvents(): Promise<Event[]> {
       .order('date', { ascending: false });
 
     if (error) throw error;
-    return data as Event[];
+    return (data as Event[]).map((event) => ({
+      ...event,
+      customization: event.customization
+        ? {
+            ...event.customization,
+            style_pack: event.customization.style_pack || DEFAULT_STYLE_PACK_ID,
+          }
+        : undefined,
+    }));
   } catch (error) {
     console.error('Erreur lors de la récupération des événements:', error);
     // En cas d'erreur, retourner un tableau vide
@@ -34,6 +43,10 @@ export async function fetchEventById(id: string): Promise<Event> {
 
   if (error) throw error;
   const event = data as Event;
+
+  if (event.customization) {
+    event.customization.style_pack = event.customization.style_pack || DEFAULT_STYLE_PACK_ID;
+  }
 
   // Après avoir récupéré l'événement et avant de le retourner, générer les URLs des assets
   if (event.customization) {
@@ -76,12 +89,18 @@ export async function createEvent(eventData: EventInput): Promise<string | null>
   try {
     console.log("Creating event with data:", JSON.stringify(eventData, null, 2));
     
+    if (!eventData.user_id) {
+      console.error("user_id is required to create an event");
+      throw new Error('user_id is required');
+    }
+    
     // Create the event
     const { data: eventResult, error: eventError } = await supabase
       .from('events')
       .insert({
         name: eventData.name,
-        date: eventData.date
+        date: eventData.date,
+        user_id: eventData.user_id
       })
       .select('id')
       .single();
@@ -105,6 +124,7 @@ export async function createEvent(eventData: EventInput): Promise<string | null>
       secondary_color: eventData.customization.secondary_color,
       background_image: eventData.customization.background_image || null,
       logo: eventData.customization.logo || null,
+      style_pack: eventData.customization.style_pack || DEFAULT_STYLE_PACK_ID,
     };
     
     console.log("Creating customization with data:", JSON.stringify(customizationData, null, 2));
@@ -188,6 +208,7 @@ export async function updateEvent(id: string, eventData: EventInput): Promise<bo
       secondary_color: eventData.customization.secondary_color,
       background_image: eventData.customization.background_image || null,
       logo: eventData.customization.logo || null,
+      style_pack: eventData.customization.style_pack || DEFAULT_STYLE_PACK_ID,
     };
     
     console.log("updateEvent: Customization data to save:", JSON.stringify(customizationData, null, 2));

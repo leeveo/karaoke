@@ -4,6 +4,9 @@ import { useParams } from 'next/navigation';
 import LiveKaraokeRecorder from '@/components/LiveKaraokeRecorder';
 import { useEffect, useState, useRef } from 'react';
 import { getSongUrl } from '../../../services/s3Service';
+import { applyStylePackCssVariables } from '@/lib/stylePacks';
+
+const FALLBACK_BACKGROUND_GRADIENT = 'linear-gradient(135deg, #080424 0%, #160e40 100%)';
 
 export default function KaraokePage() {
   const { songId } = useParams();
@@ -16,6 +19,50 @@ export default function KaraokePage() {
   
   // Extraire le nom de la chanson à partir de l'ID
   const songName = decodedSongId.split('/').pop()?.split('.')[0] || decodedSongId;
+
+  // Load customization from sessionStorage or apply defaults
+  useEffect(() => {
+    const loadCustomization = () => {
+      try {
+        // Try to get saved customization from sessionStorage
+        const savedColorsKey = Object.keys(sessionStorage).find(key => key.startsWith('event-') && key.endsWith('-colors'));
+        if (savedColorsKey) {
+          const savedColors = JSON.parse(sessionStorage.getItem(savedColorsKey) || '{}');
+          console.log('[KaraokePage] 🎨 Customization loaded from sessionStorage:', savedColors);
+          
+          // Apply style pack if available
+          if (savedColors.stylePack) {
+            applyStylePackCssVariables(savedColors.stylePack);
+          }
+          
+          // Apply colors
+          if (savedColors.primaryColor) {
+            document.documentElement.style.setProperty('--primary-color', savedColors.primaryColor);
+          }
+          if (savedColors.secondaryColor) {
+            document.documentElement.style.setProperty('--secondary-color', savedColors.secondaryColor);
+          }
+          
+          // Apply background
+          if (savedColors.backgroundImageUrl) {
+            document.documentElement.style.setProperty('--bg-image', `url('${savedColors.backgroundImageUrl}')`);
+            document.documentElement.classList.add('bg-loaded');
+          } else {
+            document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
+          }
+        } else {
+          // No saved customization - use fallback
+          console.log('[KaraokePage] ⚠️ No customization found in sessionStorage');
+          document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
+        }
+      } catch (e) {
+        console.error('[KaraokePage] Error loading customization:', e);
+        document.documentElement.style.setProperty('--bg-image', FALLBACK_BACKGROUND_GRADIENT);
+      }
+    };
+    
+    loadCustomization();
+  }, []);
 
   useEffect(() => {
     async function loadVideo() {
@@ -113,12 +160,6 @@ export default function KaraokePage() {
           <p className="text-white text-xl mt-6 font-light">
             {error || "Problème de chargement de la vidéo"}
           </p>
-          <button
-            onClick={() => window.history.back()}
-            className="mt-8 bg-white text-red-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all transform hover:scale-105 font-medium shadow-lg flex items-center justify-center mx-auto"
-          >
-            ← Revenir en arrière
-          </button>
         </div>
       </div>
     );
@@ -128,7 +169,7 @@ export default function KaraokePage() {
   return (
     <div className="app-background min-h-screen flex flex-col items-center justify-center p-8">
       {/* Overlay avec dégradé */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-purple-950/80 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/90 to-black/70 backdrop-blur-sm"></div>
       
       {/* Effets de lumière */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-40 bg-purple-600/20 blur-3xl rounded-full"></div>

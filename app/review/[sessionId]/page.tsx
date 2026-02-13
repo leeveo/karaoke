@@ -202,7 +202,7 @@ export default function ReviewPage() {
               rounded-xl shadow-xl transition-all duration-300 flex items-center gap-2
             `}
             style={{ 
-              background: 'var(--secondary-gradient)',
+              background: 'var(--primary-gradient)',
               color: 'white',
               border: '1px solid rgba(255, 255, 255, 0.1)'
             }}

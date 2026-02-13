@@ -138,8 +138,8 @@ export default function EventQRPage() {
           return;
         }
 
-        const primaryColor = eventData.customization.primary_color || '#0334b9';
-        const secondaryColor = eventData.customization.secondary_color || '#2fb9db';
+        const primaryColor = eventData.customization.primary_color || '#8b7355';
+        const secondaryColor = eventData.customization.secondary_color || '#c9a875';
 
         document.documentElement.style.setProperty('--primary-color', primaryColor);
         document.documentElement.style.setProperty('--primary-light', adjustColorLightness(primaryColor, 20));
@@ -654,7 +654,7 @@ export default function EventQRPage() {
           style={{
             backgroundImage: event?.customization?.backgroundImageUrl 
               ? `url('${event.customization.backgroundImageUrl}')` 
-              : "url('/bg.png')",
+              : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
             backgroundSize: "cover",
             backgroundPosition: "center"
           }}>
@@ -675,7 +675,7 @@ export default function EventQRPage() {
           style={{
             backgroundImage: event?.customization?.backgroundImageUrl 
               ? `url('${event.customization.backgroundImageUrl}')` 
-              : "url('/bg.png')",
+              : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundAttachment: "fixed"
@@ -711,13 +711,11 @@ export default function EventQRPage() {
           style={{
             backgroundImage: event?.customization?.backgroundImageUrl 
               ? `url('${event.customization.backgroundImageUrl}')` 
-              : "url('/bg.png')",
+              : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundAttachment: "fixed"
           }}>
-        {/* Overlay léger pour améliorer la lisibilité */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         
         {/* Contenu principal - Formulaire offline */}
         <div className="z-10 w-full max-w-7xl flex flex-col items-center">
@@ -952,13 +950,11 @@ export default function EventQRPage() {
         style={{
           backgroundImage: event?.customization?.backgroundImageUrl 
             ? `url('${event.customization.backgroundImageUrl}')` 
-            : "url('/bg.png')",
+            : "linear-gradient(135deg, #080424 0%, #160e40 100%)",
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundAttachment: "fixed"
         }}>
-      {/* Overlay léger pour améliorer la lisibilité */}
-      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       
       {/* Contenu principal */}
       <div className="z-10 w-full max-w-md flex flex-col items-center">
@@ -1103,14 +1099,14 @@ export default function EventQRPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={handleShareButtonClick}
-              className="text-white px-6 py-3 rounded-lg transition-all duration-300 w-full"
+              className="text-white px-8 py-6 rounded-xl transition-all duration-300 w-full font-extrabold text-2xl hover:shadow-2xl hover:scale-105 hover:-translate-y-1"
               style={{ 
-                background: 'var(--secondary-gradient)',
-                boxShadow: '0 4px 10px rgba(236, 72, 153, 0.3)'
+                background: 'var(--primary-gradient)',
+                boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
               }}
             >
-              <span className="flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <span className="flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                 </svg>
                 {showForm ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
@@ -1119,15 +1115,15 @@ export default function EventQRPage() {
             
             <button
               onClick={() => router.push(`/event/${id}`)}
-              className="px-6 py-3 rounded-lg transition-all duration-300 w-full"
+              className="px-8 py-6 rounded-xl transition-all duration-300 w-full font-extrabold text-2xl hover:shadow-2xl hover:scale-105 hover:-translate-y-1"
               style={{ 
                 background: 'var(--primary-gradient)',
                 color: 'white',
                 boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
               }}
             >
-              <span className="flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <span className="flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10.293 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
                 Retour 
@@ -1259,11 +1255,12 @@ export default function EventQRPage() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="text-white px-8 py-4 rounded-lg transition-all duration-300 flex justify-center w-full font-bold text-xl"
+                    className="px-8 py-4 rounded-lg transition-all duration-300 flex justify-center w-full font-bold text-xl"
                     style={{ 
                       background: isSubmitting 
-                        ? 'var(--primary-gradient)' 
+                        ? 'var(--secondary-gradient)' 
                         : 'var(--secondary-gradient)',
+                      color: 'var(--primary-color)',
                       opacity: isSubmitting ? 0.7 : 1,
                       boxShadow: '0 4px 10px rgba(236, 72, 153, 0.3)'
                     }}
@@ -1282,10 +1279,11 @@ export default function EventQRPage() {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="border px-8 py-4 rounded-lg transition-all duration-300 w-full font-bold text-lg"
+                    className="px-8 py-4 rounded-lg transition-all duration-300 w-full font-bold text-lg"
                     style={{ 
-                      borderColor: 'var(--primary-color)', 
-                      color: 'var(--primary-color)' 
+                      background: 'var(--primary-gradient)', 
+                      color: 'white',
+                      boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
                     }}
                   >
                     Annuler

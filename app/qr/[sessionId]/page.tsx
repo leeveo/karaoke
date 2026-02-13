@@ -346,14 +346,14 @@ export default function QRPage() {
             <button
               onClick={handleShareButtonClick}
               disabled={isSubmitting}
-              className="text-white px-6 py-3 rounded-lg transition-all duration-300 w-full"
+              className="text-white px-8 py-6 rounded-xl transition-all duration-300 w-full font-extrabold text-2xl hover:shadow-2xl hover:scale-105 hover:-translate-y-1"
               style={{ 
-                background: 'var(--secondary-gradient)',
-                boxShadow: '0 4px 10px rgba(236, 72, 153, 0.3)'
+                background: 'var(--primary-gradient)',
+                boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
               }}
             >
-              <span className="flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <span className="flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                 </svg>
                 {showForm ? "Partage en cours..." : emailSent ? "Partager à nouveau" : "Partager le lien par email"}
@@ -362,15 +362,15 @@ export default function QRPage() {
             
             <button
               onClick={() => router.push('/')}
-              className="px-6 py-3 rounded-lg transition-all duration-300 w-full"
+              className="px-8 py-6 rounded-xl transition-all duration-300 w-full font-extrabold text-2xl hover:shadow-2xl hover:scale-105 hover:-translate-y-1"
               style={{ 
                 background: 'var(--primary-gradient)',
                 color: 'white',
                 boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
               }}
             >
-              <span className="flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <span className="flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                 </svg>
                 Nouvelle chanson
@@ -507,8 +507,9 @@ export default function QRPage() {
                     className="text-white px-6 py-3 rounded-lg transition-all duration-300 flex justify-center w-full"
                     style={{ 
                       background: isSubmitting 
-                        ? 'var(--primary-gradient)' 
+                        ? 'var(--secondary-gradient)' 
                         : 'var(--secondary-gradient)',
+                      color: 'var(--primary-color)',
                       opacity: isSubmitting ? 0.7 : 1,
                       boxShadow: '0 4px 10px rgba(236, 72, 153, 0.3)'
                     }}
@@ -527,10 +528,11 @@ export default function QRPage() {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="border px-6 py-3 rounded-lg transition-all duration-300 w-full"
+                    className="px-6 py-3 rounded-lg transition-all duration-300 w-full"
                     style={{ 
-                      borderColor: 'var(--primary-color)', 
-                      color: 'var(--primary-color)' 
+                      background: 'var(--primary-gradient)', 
+                      color: 'white',
+                      boxShadow: '0 4px 10px rgba(139, 92, 246, 0.3)'
                     }}
                   >
                     Annuler

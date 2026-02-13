@@ -66,9 +66,9 @@ const MusicTransitionLoader: React.FC<MusicTransitionLoaderProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backdropFilter: 'blur(8px)' }}
     >
-      <div className="absolute inset-0 bg-black/70"></div>
+      {/* Fond avec l'image de fond de l'événement visible en transparence */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
       
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }} 
@@ -79,12 +79,15 @@ const MusicTransitionLoader: React.FC<MusicTransitionLoaderProps> = ({
           stiffness: 300, 
           damping: 30 
         }}
-        className="relative z-10 p-8 rounded-xl border border-white/10 shadow-2xl max-w-md w-full mx-4 backdrop-blur-md"
+        className="relative z-10 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4"
         style={{ 
-          backgroundColor: 'var(--primary-color)', // Utilisation de primary-color directement
-          boxShadow: '0 20px 60px -10px rgba(var(--primary-color-rgb), 0.4), 0 10px 20px -5px rgba(var(--secondary-color-rgb), 0.3)',
-          borderLeft: '4px solid var(--primary-color)',
-          borderRight: '4px solid var(--secondary-color)'
+          background: 'rgba(20, 20, 30, 0.95)', // Fond sombre semi-transparent neutre
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 20px 60px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          borderLeft: '3px solid var(--primary-color)',
+          borderRight: '3px solid var(--secondary-color)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
         }}
       >
         {/* Music visual elements */}

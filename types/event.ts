@@ -7,6 +7,7 @@ export interface EventCustomization {
   backgroundImageUrl?: string; // URL complète générée
   logo?: string | null; // Champ pour le logo
   logoUrl?: string; // URL complète générée
+  style_pack?: string | null;
 }
 
 export interface Event {
@@ -24,10 +25,12 @@ export interface Event {
 export interface EventInput {
   name: string;
   date: string;
+  user_id?: string;
   customization: {
     primary_color: string;
     secondary_color: string;
     background_image?: string | null;
     logo?: string | null;
+    style_pack?: string | null;
   };
 }

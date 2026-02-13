@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vider le cache des couleurs</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+        }
+        button {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            background: linear-gradient(135deg, #8b7355, #c9a875);
+            border: none;
+            border-radius: 0.5rem;
+            color: white;
+            cursor: pointer;
+            margin-top: 1rem;
+            font-weight: bold;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        .success {
+            color: #4ade80;
+            margin-top: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Vidage du cache des couleurs</h1>
+        <p>Si vous voyez toujours l'ancien fond bleu au lieu de vos couleurs d'événement, cliquez sur le bouton ci-dessous pour vider le cache des couleurs.</p>
+        <button onclick="clearCache()">Vider le cache</button>
+        <p class="success" id="success">✅ Cache vidé avec succès ! Rechargez votre page d'événement.</p>
+    </div>
+
+    <script>
+        function clearCache() {
+            // Vider tout le sessionStorage
+            sessionStorage.clear();
+            
+            // Vider aussi le localStorage au cas où
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('event-') && key.includes('-colors')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            
+            // Afficher le message de succès
+            document.getElementById('success').style.display = 'block';
+            
+            // Rediriger vers la page d'accueil après 2 secondes
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

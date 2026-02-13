@@ -68,6 +68,18 @@ async function startServer({ port, dir, offlineRoot } = {}) {
 
   const server = express();
 
+  // Servir le dossier public pour les style packs, images, etc.
+  const publicDir = path.join(resolvedDir, 'public');
+  if (fs.existsSync(publicDir)) {
+    console.log('[OfflineServer] Serving public directory:', publicDir);
+    server.use(express.static(publicDir, {
+      maxAge: '1d',
+      setHeaders(res) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      },
+    }));
+  }
+
   if (manifest && assetsDir && fs.existsSync(assetsDir)) {
     console.log('[OfflineServer] Offline package detected:', resolvedOfflineRoot);
     server.get('/api/offline/manifest', (_req, res) => {

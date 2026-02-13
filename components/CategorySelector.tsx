@@ -1,16 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getCategories } from '../services/s3Service';
 import { motion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { EffectCoverflow, Autoplay, Navigation, Pagination } from 'swiper/modules';
+import type { Swiper as SwiperInstance } from 'swiper/types';
 import 'swiper/css';
 import 'swiper/css/effect-coverflow';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 import './category-swiper.css';
+import { resolveCategoryBackground } from '@/lib/stylePacks';
 
 // Modern SVG icons for categories
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -116,16 +118,31 @@ const getCategoryIcon = (category: string): React.ReactNode => {
 
 interface CategorySelectorProps {
   eventId?: string; // ID de l'événement optionnel
+  stylePackId?: string | null;
 }
 
-export default function CategorySelector({ eventId }: CategorySelectorProps) {
+export default function CategorySelector({ eventId, stylePackId }: CategorySelectorProps) {
   const router = useRouter();
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const swiperInstanceRef = useRef<SwiperInstance | null>(null);
   const desktopSlidesPerView = 3.5;
+
+  const updateActiveSlideFromInstance = useCallback((instance?: SwiperInstance | null) => {
+    const swiper = instance ?? swiperInstanceRef.current;
+    if (!swiper || !swiper.slides?.length) {
+      return;
+    }
+    const activeSlide = swiper.slides[swiper.activeIndex];
+    const categoryValue = activeSlide?.getAttribute?.('data-category');
+    if (categoryValue) {
+      setActiveCategory(categoryValue);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -178,7 +195,21 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
     return `/category/${category}`;
   };
 
+  useEffect(() => {
+    if (!categories.length) {
+      setActiveCategory(null);
+      return;
+    }
+    if (!activeCategory || !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories, activeCategory]);
+
   const handleSelect = (cat: string) => {
+    if (cat !== activeCategory || selectedCategory) {
+      return;
+    }
+
     setSelectedCategory(cat);
     
     // Animation delay before navigation
@@ -271,16 +302,30 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
           paddingTop: '50px',
           paddingBottom: '80px',
         }}
+        onSwiper={(instance: SwiperInstance) => {
+          swiperInstanceRef.current = instance;
+          updateActiveSlideFromInstance(instance);
+        }}
+        onSlideChange={(instance: SwiperInstance) => {
+          updateActiveSlideFromInstance(instance);
+        }}
       >
-        {categories.map((cat, index) => (
-          <SwiperSlide key={`${cat}-${index}`}>
+        {categories.map((cat, index) => {
+          const isActive = cat === activeCategory;
+          const isInteractive = isActive && !selectedCategory;
+          return (
+            <SwiperSlide key={`${cat}-${index}`} data-category={cat}>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.02, y: -10 }}
-              className="cursor-pointer h-full w-full flex items-center justify-center"
-              onClick={() => handleSelect(cat)}
+              whileHover={isInteractive ? { scale: 1.02, y: -10 } : undefined}
+              className={`h-full w-full flex items-center justify-center ${isInteractive ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+              onClick={isInteractive ? () => handleSelect(cat) : undefined}
+              tabIndex={isInteractive ? 0 : -1}
+              aria-disabled={!isInteractive}
+              role="button"
+              style={{ pointerEvents: isInteractive ? 'auto' : 'none' }}
             >
               <div 
                 className={`
@@ -289,50 +334,48 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
                 `}
                 style={{ 
                   height: '400px',
-                  border: '3px solid white',
-                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 255, 255, 0.2)'
+                  border: 'var(--style-pack-card-border, 3px solid rgba(255,255,255,0.85))',
+                  boxShadow: 'var(--style-pack-card-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.8))',
+                  fontFamily: 'var(--style-pack-heading-font, inherit)'
                 }}
               >
-                {/* Background Image */}
-                <div className="absolute inset-0">
-                  <img
-                    src={`/categories/${cat.toLowerCase()}.png`}
-                    alt={cat}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback to gradient if image not found
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      target.parentElement!.style.background = index % 2 === 0 
-                        ? 'var(--primary-gradient)'
-                        : 'var(--secondary-gradient)';
-                    }}
-                  />
-                  {/* Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                </div>
-
-                {/* Content - Text Only */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-white z-10">
-                  <h3 
-                    className="text-4xl font-bold capitalize tracking-wide text-center drop-shadow-2xl"
-                    style={{
-                      textShadow: '0 4px 8px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.3)'
-                    }}
-                  >
-                    {cat === 'all' ? 'Toutes les chansons' : cat}
-                  </h3>
-                </div>
-                
-                {/* Use CSS variables for gradients - important for theme switching */}
-                <div 
-                  className="absolute inset-0 opacity-80 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none mix-blend-overlay"
+                {/* Background Layer */}
+                <div
+                  className="absolute inset-0"
                   style={{
-                    background: index % 2 === 0 
-                      ? 'var(--primary-gradient)'
-                      : 'var(--secondary-gradient)'
+                    backgroundImage: resolveCategoryBackground(stylePackId, cat),
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'saturate(1.05)'
                   }}
                 ></div>
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: 'var(--style-pack-card-overlay, rgba(0,0,0,0.6))'
+                  }}
+                ></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/52 to-transparent"></div>
+
+                {/* Content - Text Only */}
+                <div className="absolute inset-0 flex flex-col items-center justify-end p-6 pb-10 z-10">
+                  <div className="relative px-8 py-4">
+                    {/* Cadre blanc sous le texte */}
+                    <div
+                      className="absolute inset-0 rounded-2xl border border-white/90 shadow-2xl backdrop-blur-md"
+                      style={{ boxShadow: '0 18px 36px rgba(0,0,0,0.38)', backgroundColor: 'rgba(255,255,255,0.96)' }}
+                    ></div>
+                    <h3
+                      className="relative text-4xl font-bold capitalize tracking-wide text-center"
+                      style={{
+                        color: 'var(--primary-color, #0f172a)',
+                        textShadow: '0 2px 6px rgba(0,0,0,0.18)'
+                      }}
+                    >
+                      {cat === 'all' ? 'Toutes les chansons' : cat}
+                    </h3>
+                  </div>
+                </div>
                 
                 {/* Animated pattern overlay */}
                 <div className="absolute inset-0 bg-[url('/pattern.png')] bg-repeat opacity-10 group-hover:opacity-20 transition-opacity"></div>
@@ -352,8 +395,9 @@ export default function CategorySelector({ eventId }: CategorySelectorProps) {
                 )}
               </div>
             </motion.div>
-          </SwiperSlide>
-        ))}
+            </SwiperSlide>
+          );
+        })}
       </Swiper>
     </motion.div>
   );
