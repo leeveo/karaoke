@@ -407,15 +407,17 @@ function EventPageContent() {
       
       <div className="relative z-10 container mx-auto px-4 py-8 flex flex-col items-center w-full gap-8">
         {/* Event header with logo */}
-        <h1 className="text-4xl font-bold text-white text-center"
-         
-        >
-          {event.name}
-        </h1>
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold text-center"
+            style={{ color: 'var(--secondary-color)' }}
+          >
+            {event.name}
+          </h1>
+        </div>
         
         {/* Display the logo if available */}
         {event.customization?.logoUrl && (
-          <div className="w-64 h-64 p-2 flex items-center justify-center"
+          <div className="w-48 h-48 p-2 flex items-center justify-center"
             style={{
               boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.25), 0 0 30px 5px rgba(var(--secondary-rgb), 0.2), 0 8px 16px rgba(0, 0, 0, 0.3)'
             }}

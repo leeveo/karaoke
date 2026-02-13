@@ -1239,19 +1239,17 @@ export default function EventCategoryPageClient({
         <div className="relative z-10 w-full h-full flex flex-col py-6 px-4">
           {/* Partie du haut (titre + bouton retour) - reste fixe */}
           <div className="flex-shrink-0">
-            <motion.h1 
-              initial={{ y: -20 }}
-              animate={{ y: 0 }}
-              style={{ color: 'var(--secondary-color)' }}
-              className="text-3xl md:text-4xl font-bold mb-8 text-center"
-            >
-              {event?.name && (
-                <div className="text-xl opacity-70 mb-1">
-                  {event.name}
-                </div>
-              )}
-              SÉLECTIONNE TA CHANSON 
-            </motion.h1>
+            <div className="max-w-6xl mx-auto">
+              <motion.h1 
+                initial={{ y: -20 }}
+                animate={{ y: 0 }}
+                style={{ color: 'var(--secondary-color)' }}
+                className="text-4xl font-bold mb-8 text-center"
+              >
+               
+                SÉLECTIONNE TA CHANSON 
+              </motion.h1>
+            </div>
             
             {/* Back button */}
             <div className="mb-8 text-center">
